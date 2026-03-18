@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="Common/Common.csproj" />
+  <Project Path="DashBoard/DashBoard.csproj" />
+  <Project Path="GateWay/GateWay.csproj" />
+  <Project Path="HeartBeat/HeartBeat.csproj" />
+  <Project Path="WatchTower/WatchTower.csproj" />
+</Solution>

@@ -1,123 +1,135 @@
+using cl.MedelCodeFactory.IoT.HeartBeat.Configuration;
 using cl.MedelCodeFactory.IoT.HeartBeat.DTOs;
-using cl.MedelCodeFactory.IoT.HeartBeat.Options;
 using cl.MedelCodeFactory.IoT.HeartBeat.Repositories;
 using cl.MedelCodeFactory.IoT.HeartBeat.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 🔥 IMPORTANTE: escuchar en red local (para ESP32)
-builder.WebHost.UseUrls("http://0.0.0.0:5009");
+builder.Services.Configure<HeartbeatOptions>(
+    builder.Configuration.GetSection("Heartbeat"));
 
-// 🔧 Configuración DB
-builder.Services.Configure<DatabaseOptions>(options =>
-{
-    options.ConnectionString = builder.Configuration.GetConnectionString("IoTMonitoreo")
-        ?? throw new InvalidOperationException("No se encontró la cadena de conexión IoTMonitoreo.");
-});
-
-// 🔧 DI
-builder.Services.AddScoped<IHeartbeatRepository, SqlHeartbeatRepository>();
-builder.Services.AddScoped<IHeartbeatService, HeartbeatService>();
-
-// 🔧 Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+builder.Services.AddSingleton<IHeartbeatRepository, SqlHeartbeatRepository>();
+builder.Services.AddSingleton<IOperationalStatusEvaluator, OperationalStatusEvaluator>();
+builder.Services.AddSingleton<IHeartbeatService, HeartbeatService>();
+
 var app = builder.Build();
 
-// 🔧 Swagger solo en desarrollo
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+app.UseSwagger();
+app.UseSwaggerUI();
 
-// ==============================
-// 🏠 ROOT
-// ==============================
-app.MapGet("/", () => Results.Ok(new
+app.MapPost("/heartbeat", async (
+    HeartbeatRequestDTO request,
+    IHeartbeatService heartbeatService,
+    ILoggerFactory loggerFactory,
+    CancellationToken cancellationToken) =>
 {
-    service = "IoT.HeartBeat",
-    message = "Servicio activo",
-    endpoints = new[]
+    ILogger logger = loggerFactory.CreateLogger("HeartbeatEndpoint");
+
+    try
     {
-        "/health",
-        "/heartbeat",
-        "/swagger"
-    },
-    timestampUtc = DateTime.UtcNow
-}));
+        var result = await heartbeatService.ProcessHeartbeatAsync(request, cancellationToken);
 
-// ==============================
-// ❤️ HEALTH CHECK
-// ==============================
-app.MapGet("/health", () => Results.Ok(new
-{
-    service = "IoT.HeartBeat",
-    status = "Healthy",
-    timestampUtc = DateTime.UtcNow
-}));
+        if (!result.Success)
+        {
+            var error = new ApiErrorResponseDTO
+            {
+                Success = false,
+                Code = result.Code,
+                Message = result.Message,
+                DeviceId = result.DeviceId
+            };
 
-// ==============================
-// 📡 HEARTBEAT
-// ==============================
-app.MapPost("/heartbeat",
-    async (
-        HeartbeatRequest request,
-        IHeartbeatService heartbeatService,
-        ILoggerFactory loggerFactory,
-        CancellationToken cancellationToken) =>
+            return Results.Json(error, statusCode: result.StatusCode);
+        }
+
+        if (string.IsNullOrWhiteSpace(result.DeviceId) ||
+            string.IsNullOrWhiteSpace(result.OperationalStatus) ||
+            !result.ReceivedAtUtc.HasValue)
+        {
+            logger.LogError(
+                "Resultado inconsistente al procesar heartbeat. Success={Success}, DeviceId={DeviceId}, OperationalStatus={OperationalStatus}, ReceivedAtUtc={ReceivedAtUtc}",
+                result.Success,
+                result.DeviceId,
+                result.OperationalStatus,
+                result.ReceivedAtUtc);
+
+            return Results.Json(
+                new ApiErrorResponseDTO
+                {
+                    Success = false,
+                    Code = "INTERNAL_ERROR",
+                    Message = "Se produjo una inconsistencia interna al procesar el heartbeat."
+                },
+                statusCode: StatusCodes.Status500InternalServerError);
+        }
+
+        var response = new HeartbeatAckResponseDTO
+        {
+            Success = true,
+            Code = result.Code,
+            Message = result.Message,
+            DeviceId = result.DeviceId,
+            Status = result.OperationalStatus,
+            ReceivedAtUtc = result.ReceivedAtUtc.Value
+        };
+
+        return Results.Ok(response);
+    }
+    catch (Exception ex)
     {
-        ILogger logger = loggerFactory.CreateLogger("HeartbeatEndpoint");
+        logger.LogError(ex, "Error no controlado al procesar heartbeat.");
 
-        if (request == null)
-        {
-            return Results.BadRequest(new
+        return Results.Json(
+            new ApiErrorResponseDTO
             {
-                ack = false,
-                message = "Payload inválido."
-            });
-        }
+                Success = false,
+                Code = "INTERNAL_ERROR",
+                Message = "Se produjo un error interno al procesar el heartbeat."
+            },
+            statusCode: StatusCodes.Status500InternalServerError);
+    }
+});
 
-        if (string.IsNullOrWhiteSpace(request.DeviceId))
-        {
-            return Results.BadRequest(new
+app.MapGet("/devices/{deviceId}", async (
+    string deviceId,
+    IHeartbeatService heartbeatService,
+    CancellationToken cancellationToken) =>
+{
+    var device = await heartbeatService.GetDeviceAsync(deviceId, cancellationToken);
+
+    if (device == null)
+    {
+        return Results.Json(
+            new ApiErrorResponseDTO
             {
-                ack = false,
-                message = "deviceId es obligatorio."
-            });
-        }
+                Success = false,
+                Code = "DEVICE_NOT_FOUND",
+                Message = "El dispositivo no existe en el inventario.",
+                DeviceId = deviceId
+            },
+            statusCode: StatusCodes.Status404NotFound);
+    }
 
-        try
-        {
-            HeartbeatAckResponse response =
-                await heartbeatService.ProcessAsync(request, cancellationToken);
+    return Results.Ok(device);
+});
 
-            return Results.Ok(response);
-        }
-        catch (InvalidOperationException ex) when (ex.Message == "DEVICE_NOT_REGISTERED")
-        {
-            logger.LogWarning("Heartbeat rechazado por dispositivo no registrado. DeviceId: {DeviceId}", request.DeviceId);
+app.MapGet("/devices/offline", async (
+    IHeartbeatService heartbeatService,
+    CancellationToken cancellationToken) =>
+{
+    var items = await heartbeatService.GetOfflineDevicesAsync(cancellationToken);
+    return Results.Ok(items);
+});
 
-            return Results.NotFound(new
-            {
-                ack = false,
-                deviceId = request.DeviceId,
-                message = "El dispositivo no está registrado en inventario."
-            });
-        }
-        catch (UnauthorizedAccessException ex) when (ex.Message == "DEVICE_DISABLED")
-        {
-            logger.LogWarning("Heartbeat rechazado por dispositivo deshabilitado. DeviceId: {DeviceId}", request.DeviceId);
-
-            return Results.StatusCode(StatusCodes.Status403Forbidden);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error procesando heartbeat. DeviceId: {DeviceId}", request.DeviceId);
-
-            return Results.StatusCode(StatusCodes.Status500InternalServerError);
-        }
-    });
+app.MapGet("/devices/degraded", async (
+    IHeartbeatService heartbeatService,
+    CancellationToken cancellationToken) =>
+{
+    var items = await heartbeatService.GetDegradedDevicesAsync(cancellationToken);
+    return Results.Ok(items);
+});
 
 app.Run();

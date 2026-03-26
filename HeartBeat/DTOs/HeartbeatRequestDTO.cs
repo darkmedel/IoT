@@ -2,7 +2,7 @@
 
 namespace cl.MedelCodeFactory.IoT.HeartBeat.DTOs
 {
-    public sealed class HeartbeatRequest
+    public sealed class HeartbeatRequestDTO
     {
         [Required]
         [StringLength(12, MinimumLength = 12)]
@@ -20,7 +20,7 @@ namespace cl.MedelCodeFactory.IoT.HeartBeat.DTOs
         [Range(0, int.MaxValue)]
         public int EventQueueSize { get; set; }
 
-        [Range(0, int.MaxValue)]
+        [Range(0, long.MaxValue)]
         public long FreeHeap { get; set; }
     }
 }

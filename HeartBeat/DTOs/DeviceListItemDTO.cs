@@ -1,23 +1,20 @@
-﻿namespace cl.MedelCodeFactory.IoT.HeartBeat.Models
+﻿namespace cl.MedelCodeFactory.IoT.HeartBeat.DTOs
 {
-    public sealed class DeviceHeartbeatSnapshot
+    public sealed class DeviceListItemDTO
     {
         public string DeviceId { get; set; } = string.Empty;
         public string DeviceName { get; set; } = string.Empty;
         public string? TipoHardware { get; set; }
 
-        public long? Uptime { get; set; }
+        public string OperationalStatus { get; set; } = string.Empty;
+        public DateTime? LastHeartbeatReceivedAtUtc { get; set; }
+
         public int? Rssi { get; set; }
         public bool? WsConnected { get; set; }
         public int? EventQueueSize { get; set; }
         public long? FreeHeap { get; set; }
 
-        public string? PersistedOperationalStatus { get; set; }
-        public DateTime? LastHeartbeatReceivedAtUtc { get; set; }
-        public string? IssuesJson { get; set; }
-
         public int? EmpresaId { get; set; }
         public string? EmpresaNombre { get; set; }
-        public bool HasActiveAssignment { get; set; }
     }
 }

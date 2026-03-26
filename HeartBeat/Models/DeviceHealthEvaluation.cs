@@ -1,4 +1,4 @@
-﻿namespace WatchTower.Models
+﻿namespace HeartBeat.Models
 {
     public class DeviceHealthEvaluation
     {

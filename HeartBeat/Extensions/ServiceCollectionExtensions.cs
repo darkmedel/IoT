@@ -1,4 +1,4 @@
-﻿namespace WatchTower.Extensions
+﻿namespace HeartBeat.Extensions
 {
     public class ServiceCollectionExtensions
     {

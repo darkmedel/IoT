@@ -1,4 +1,4 @@
-﻿namespace WatchTower.Services
+﻿namespace HeartBeat.Services
 {
     public class IHeartbeatProcessor
     {

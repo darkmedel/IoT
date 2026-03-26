@@ -1,4 +1,4 @@
-﻿namespace WatchTower.DTOs
+﻿namespace HeartBeat.DTOs
 {
     public class HeartbeatAcceptedResponse
     {

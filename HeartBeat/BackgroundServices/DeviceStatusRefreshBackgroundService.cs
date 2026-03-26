@@ -1,4 +1,4 @@
-﻿namespace WatchTower.BackgroundServices
+﻿namespace HeartBeat.BackgroundServices
 {
     public class DeviceStatusRefreshBackgroundService
     {

@@ -5,15 +5,24 @@ using cl.MedelCodeFactory.IoT.HeartBeat.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// 🔥 IMPORTANTE: escuchar en toda la red
+builder.WebHost.UseUrls("http://0.0.0.0:5009");
+
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException("No se encontró la cadena de conexión 'DefaultConnection'.");
+}
+
 builder.Services.Configure<HeartbeatOptions>(
     builder.Configuration.GetSection("Heartbeat"));
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddSingleton<IHeartbeatRepository, SqlHeartbeatRepository>();
-builder.Services.AddSingleton<IOperationalStatusEvaluator, OperationalStatusEvaluator>();
-builder.Services.AddSingleton<IHeartbeatService, HeartbeatService>();
+builder.Services.AddScoped<IHeartbeatRepository, SqlHeartbeatRepository>();
+builder.Services.AddScoped<IOperationalStatusEvaluator, OperationalStatusEvaluator>();
+builder.Services.AddScoped<IHeartbeatService, HeartbeatService>();
 
 var app = builder.Build();
 

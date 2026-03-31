@@ -4,9 +4,8 @@
     {
         public int DelayedThresholdSeconds { get; set; } = 90;
         public int OfflineThresholdSeconds { get; set; } = 300;
-
         public int DegradedRssiThreshold { get; set; } = -80;
         public int DegradedEventQueueThreshold { get; set; } = 10;
-        public int DegradedFreeHeapThreshold { get; set; } = 150000;
+        public long DegradedFreeHeapThreshold { get; set; } = 150000;
     }
 }

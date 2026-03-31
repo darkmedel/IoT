@@ -69,7 +69,7 @@ namespace cl.MedelCodeFactory.IoT.HeartBeat.Services
                     Success = false,
                     StatusCode = StatusCodes.Status404NotFound,
                     Code = "DEVICE_NOT_FOUND",
-                    Message = "El dispositivo no existe en el inventario.",
+                    Message = "El dispositivo no existe en inventario.",
                     DeviceId = request.DeviceId
                 };
             }
@@ -86,14 +86,17 @@ namespace cl.MedelCodeFactory.IoT.HeartBeat.Services
                     Success = false,
                     StatusCode = StatusCodes.Status409Conflict,
                     Code = "DEVICE_NOT_ASSIGNED",
-                    Message = "El dispositivo no tiene una asignación activa en EmpresaDispositivo.",
+                    Message = "El dispositivo no tiene asignación activa en EmpresaDispositivo.",
                     DeviceId = request.DeviceId
                 };
             }
 
             DateTime receivedAtUtc = DateTime.UtcNow;
 
-            DeviceHeartbeatSnapshot transientSnapshot = new DeviceHeartbeatSnapshot
+            DateTime? previousHeartbeatReceivedAtUtc =
+                await _repository.GetLastHeartbeatReceivedAtUtcAsync(request.DeviceId, cancellationToken);
+
+            var transientSnapshot = new DeviceHeartbeatSnapshot
             {
                 DeviceId = request.DeviceId,
                 Uptime = request.Uptime,
@@ -101,27 +104,32 @@ namespace cl.MedelCodeFactory.IoT.HeartBeat.Services
                 WsConnected = request.WsConnected,
                 EventQueueSize = request.EventQueueSize,
                 FreeHeap = request.FreeHeap,
-                LastHeartbeatReceivedAtUtc = receivedAtUtc
+                LastHeartbeatReceivedAtUtc = receivedAtUtc,
+                PreviousHeartbeatReceivedAtUtc = previousHeartbeatReceivedAtUtc
             };
 
-            string operationalStatus = _statusEvaluator.Evaluate(transientSnapshot, receivedAtUtc);
+            DeviceHealthEvaluation evaluation =
+                _statusEvaluator.Evaluate(transientSnapshot, receivedAtUtc);
 
             await _repository.UpsertHeartbeatCurrentAsync(
                 request,
-                operationalStatus,
+                evaluation,
                 receivedAtUtc,
                 cancellationToken);
 
             await _repository.InsertHeartbeatHistoryAsync(
                 request,
-                operationalStatus,
+                evaluation,
                 receivedAtUtc,
                 cancellationToken);
 
+            string? issuesJson = evaluation.GetIssuesJson();
+
             _logger.LogInformation(
-                "Heartbeat procesado correctamente. DeviceId={DeviceId}, Status={Status}, ReceivedAtUtc={ReceivedAtUtc}",
+                "Heartbeat procesado. DeviceId={DeviceId}, Status={Status}, IssuesJson={IssuesJson}, ReceivedAtUtc={ReceivedAtUtc}",
                 request.DeviceId,
-                operationalStatus,
+                evaluation.OperationalStatus,
+                issuesJson,
                 receivedAtUtc);
 
             return new HeartbeatProcessResult
@@ -131,7 +139,8 @@ namespace cl.MedelCodeFactory.IoT.HeartBeat.Services
                 Code = "ACK",
                 Message = "Heartbeat procesado correctamente.",
                 DeviceId = request.DeviceId,
-                OperationalStatus = operationalStatus,
+                OperationalStatus = evaluation.OperationalStatus,
+                IssuesJson = issuesJson,
                 ReceivedAtUtc = receivedAtUtc
             };
         }
@@ -147,86 +156,97 @@ namespace cl.MedelCodeFactory.IoT.HeartBeat.Services
                 return null;
             }
 
-            DeviceHeartbeatSnapshot? snapshot = await _repository.GetDeviceSnapshotAsync(
-                normalizedDeviceId,
-                cancellationToken);
+            DeviceHeartbeatSnapshot? snapshot =
+                await _repository.GetDeviceSnapshotAsync(normalizedDeviceId, cancellationToken);
 
             if (snapshot == null)
             {
                 return null;
             }
 
-            DateTime utcNow = DateTime.UtcNow;
-            string effectiveStatus = _statusEvaluator.Evaluate(snapshot, utcNow);
+            DeviceHealthEvaluation evaluation =
+                _statusEvaluator.Evaluate(snapshot, DateTime.UtcNow);
 
             return new DeviceDetailsResponseDTO
             {
                 DeviceId = snapshot.DeviceId,
                 DeviceName = snapshot.DeviceName,
                 TipoHardware = snapshot.TipoHardware,
-                OperationalStatus = effectiveStatus,
+                OperationalStatus = evaluation.OperationalStatus,
+                PersistedOperationalStatus = snapshot.PersistedOperationalStatus,
                 LastHeartbeatReceivedAtUtc = snapshot.LastHeartbeatReceivedAtUtc,
                 Uptime = snapshot.Uptime,
                 Rssi = snapshot.Rssi,
                 WsConnected = snapshot.WsConnected,
                 EventQueueSize = snapshot.EventQueueSize,
                 FreeHeap = snapshot.FreeHeap,
-                IssuesJson = snapshot.IssuesJson,
+                IssuesJson = evaluation.GetIssuesJson(),
                 EmpresaId = snapshot.EmpresaId,
                 EmpresaNombre = snapshot.EmpresaNombre,
                 HasActiveAssignment = snapshot.HasActiveAssignment
             };
         }
 
-        public async Task<IReadOnlyList<DeviceListItemDTO>> GetOfflineDevicesAsync(CancellationToken cancellationToken)
+        public async Task<IReadOnlyList<DeviceListItemDTO>> GetOfflineDevicesAsync(
+            CancellationToken cancellationToken)
         {
-            IReadOnlyList<DeviceHeartbeatSnapshot> snapshots = await _repository.GetAllCurrentSnapshotsAsync(cancellationToken);
+            IReadOnlyList<DeviceHeartbeatSnapshot> snapshots =
+                await _repository.GetAllCurrentSnapshotsAsync(cancellationToken);
+
             DateTime utcNow = DateTime.UtcNow;
 
             return snapshots
-                .Select(x => new
+                .Select(snapshot => new
                 {
-                    Snapshot = x,
-                    Status = _statusEvaluator.Evaluate(x, utcNow)
+                    Snapshot = snapshot,
+                    Evaluation = _statusEvaluator.Evaluate(snapshot, utcNow)
                 })
-                .Where(x => x.Status == "Offline")
-                .Select(x => MapListItem(x.Snapshot, x.Status))
+                .Where(x => x.Evaluation.OperationalStatus == "Offline")
+                .Select(x => MapListItem(x.Snapshot, x.Evaluation))
                 .OrderBy(x => x.LastHeartbeatReceivedAtUtc)
                 .ToList();
         }
 
-        public async Task<IReadOnlyList<DeviceListItemDTO>> GetDegradedDevicesAsync(CancellationToken cancellationToken)
+        public async Task<IReadOnlyList<DeviceListItemDTO>> GetDegradedDevicesAsync(
+            CancellationToken cancellationToken)
         {
-            IReadOnlyList<DeviceHeartbeatSnapshot> snapshots = await _repository.GetAllCurrentSnapshotsAsync(cancellationToken);
+            IReadOnlyList<DeviceHeartbeatSnapshot> snapshots =
+                await _repository.GetAllCurrentSnapshotsAsync(cancellationToken);
+
             DateTime utcNow = DateTime.UtcNow;
 
             return snapshots
-                .Select(x => new
+                .Select(snapshot => new
                 {
-                    Snapshot = x,
-                    Status = _statusEvaluator.Evaluate(x, utcNow)
+                    Snapshot = snapshot,
+                    Evaluation = _statusEvaluator.Evaluate(snapshot, utcNow)
                 })
-                .Where(x => x.Status == "Degraded")
-                .Select(x => MapListItem(x.Snapshot, x.Status))
+                .Where(x => x.Evaluation.OperationalStatus == "Degraded")
+                .Select(x => MapListItem(x.Snapshot, x.Evaluation))
                 .OrderBy(x => x.DeviceId)
                 .ToList();
         }
 
-        private static DeviceListItemDTO MapListItem(DeviceHeartbeatSnapshot snapshot, string status)
+        private static DeviceListItemDTO MapListItem(
+            DeviceHeartbeatSnapshot snapshot,
+            DeviceHealthEvaluation evaluation)
         {
             return new DeviceListItemDTO
             {
                 DeviceId = snapshot.DeviceId,
                 DeviceName = snapshot.DeviceName,
                 TipoHardware = snapshot.TipoHardware,
-                OperationalStatus = status,
+                OperationalStatus = evaluation.OperationalStatus,
+                PersistedOperationalStatus = snapshot.PersistedOperationalStatus,
                 LastHeartbeatReceivedAtUtc = snapshot.LastHeartbeatReceivedAtUtc,
                 Rssi = snapshot.Rssi,
                 WsConnected = snapshot.WsConnected,
                 EventQueueSize = snapshot.EventQueueSize,
                 FreeHeap = snapshot.FreeHeap,
+                IssuesJson = evaluation.GetIssuesJson(),
                 EmpresaId = snapshot.EmpresaId,
-                EmpresaNombre = snapshot.EmpresaNombre
+                EmpresaNombre = snapshot.EmpresaNombre,
+                HasActiveAssignment = snapshot.HasActiveAssignment
             };
         }
 
@@ -246,10 +266,7 @@ namespace cl.MedelCodeFactory.IoT.HeartBeat.Services
 
             foreach (char c in deviceId)
             {
-                bool isHex =
-                    (c >= '0' && c <= '9') ||
-                    (c >= 'A' && c <= 'F');
-
+                bool isHex = (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F');
                 if (!isHex)
                 {
                     return false;

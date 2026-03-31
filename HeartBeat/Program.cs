@@ -1,14 +1,14 @@
 using cl.MedelCodeFactory.IoT.HeartBeat.Configuration;
 using cl.MedelCodeFactory.IoT.HeartBeat.DTOs;
+using cl.MedelCodeFactory.IoT.HeartBeat.Models;
 using cl.MedelCodeFactory.IoT.HeartBeat.Repositories;
 using cl.MedelCodeFactory.IoT.HeartBeat.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 🔥 IMPORTANTE: escuchar en toda la red
 builder.WebHost.UseUrls("http://0.0.0.0:5009");
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+string? connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 if (string.IsNullOrWhiteSpace(connectionString))
 {
     throw new InvalidOperationException("No se encontró la cadena de conexión 'DefaultConnection'.");
@@ -20,7 +20,7 @@ builder.Services.Configure<HeartbeatOptions>(
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddScoped<IHeartbeatRepository, SqlHeartbeatRepository>();
+builder.Services.AddScoped<IHeartbeatRepository, SqlDeviceHeartbeatRepository>();
 builder.Services.AddScoped<IOperationalStatusEvaluator, OperationalStatusEvaluator>();
 builder.Services.AddScoped<IHeartbeatService, HeartbeatService>();
 
@@ -39,11 +39,12 @@ app.MapPost("/heartbeat", async (
 
     try
     {
-        var result = await heartbeatService.ProcessHeartbeatAsync(request, cancellationToken);
+        HeartbeatProcessResult result =
+            await heartbeatService.ProcessHeartbeatAsync(request, cancellationToken);
 
         if (!result.Success)
         {
-            var error = new ApiErrorResponseDTO
+            ApiErrorResponseDTO error = new()
             {
                 Success = false,
                 Code = result.Code,
@@ -54,9 +55,9 @@ app.MapPost("/heartbeat", async (
             return Results.Json(error, statusCode: result.StatusCode);
         }
 
-        if (string.IsNullOrWhiteSpace(result.DeviceId) ||
-            string.IsNullOrWhiteSpace(result.OperationalStatus) ||
-            !result.ReceivedAtUtc.HasValue)
+        if (string.IsNullOrWhiteSpace(result.DeviceId)
+            || string.IsNullOrWhiteSpace(result.OperationalStatus)
+            || !result.ReceivedAtUtc.HasValue)
         {
             logger.LogError(
                 "Resultado inconsistente al procesar heartbeat. Success={Success}, DeviceId={DeviceId}, OperationalStatus={OperationalStatus}, ReceivedAtUtc={ReceivedAtUtc}",
@@ -75,7 +76,7 @@ app.MapPost("/heartbeat", async (
                 statusCode: StatusCodes.Status500InternalServerError);
         }
 
-        var response = new HeartbeatAckResponseDTO
+        HeartbeatAckResponseDTO response = new()
         {
             Success = true,
             Code = result.Code,
@@ -105,9 +106,13 @@ app.MapPost("/heartbeat", async (
 app.MapGet("/devices/{deviceId}", async (
     string deviceId,
     IHeartbeatService heartbeatService,
+    HttpContext httpContext,
     CancellationToken cancellationToken) =>
 {
-    var device = await heartbeatService.GetDeviceAsync(deviceId, cancellationToken);
+    httpContext.Response.Headers["X-Heartbeat-Endpoint-Status"] = "Deprecated-Use-WatchTower";
+
+    DeviceDetailsResponseDTO? device =
+        await heartbeatService.GetDeviceAsync(deviceId, cancellationToken);
 
     if (device == null)
     {
@@ -116,7 +121,7 @@ app.MapGet("/devices/{deviceId}", async (
             {
                 Success = false,
                 Code = "DEVICE_NOT_FOUND",
-                Message = "El dispositivo no existe en el inventario.",
+                Message = "El dispositivo no existe en inventario o no está habilitado.",
                 DeviceId = deviceId
             },
             statusCode: StatusCodes.Status404NotFound);
@@ -127,17 +132,27 @@ app.MapGet("/devices/{deviceId}", async (
 
 app.MapGet("/devices/offline", async (
     IHeartbeatService heartbeatService,
+    HttpContext httpContext,
     CancellationToken cancellationToken) =>
 {
-    var items = await heartbeatService.GetOfflineDevicesAsync(cancellationToken);
+    httpContext.Response.Headers["X-Heartbeat-Endpoint-Status"] = "Deprecated-Use-WatchTower";
+
+    IReadOnlyList<DeviceListItemDTO> items =
+        await heartbeatService.GetOfflineDevicesAsync(cancellationToken);
+
     return Results.Ok(items);
 });
 
 app.MapGet("/devices/degraded", async (
     IHeartbeatService heartbeatService,
+    HttpContext httpContext,
     CancellationToken cancellationToken) =>
 {
-    var items = await heartbeatService.GetDegradedDevicesAsync(cancellationToken);
+    httpContext.Response.Headers["X-Heartbeat-Endpoint-Status"] = "Deprecated-Use-WatchTower";
+
+    IReadOnlyList<DeviceListItemDTO> items =
+        await heartbeatService.GetDegradedDevicesAsync(cancellationToken);
+
     return Results.Ok(items);
 });
 

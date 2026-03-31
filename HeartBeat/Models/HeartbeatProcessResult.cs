@@ -9,7 +9,7 @@
 
         public string? DeviceId { get; set; }
         public string? OperationalStatus { get; set; }
-
+        public string? IssuesJson { get; set; }
         public DateTime? ReceivedAtUtc { get; set; }
     }
 }

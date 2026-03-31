@@ -1,4 +1,5 @@
 ﻿using cl.MedelCodeFactory.IoT.HeartBeat.Configuration;
+using cl.MedelCodeFactory.IoT.HeartBeat.Enums;
 using cl.MedelCodeFactory.IoT.HeartBeat.Models;
 using Microsoft.Extensions.Options;
 
@@ -18,120 +19,105 @@ namespace cl.MedelCodeFactory.IoT.HeartBeat.Services
             _options = options.Value;
         }
 
-        public string Evaluate(DeviceHeartbeatSnapshot snapshot, DateTime utcNow)
+        public DeviceHealthEvaluation Evaluate(DeviceHeartbeatSnapshot snapshot, DateTime utcNow)
         {
             if (snapshot == null)
             {
-                return StatusOffline;
+                return new DeviceHealthEvaluation
+                {
+                    OperationalStatus = StatusOffline,
+                    Issues = new List<string> { DeviceIssueCodes.HeartbeatMissing }
+                };
             }
 
-            bool hasHeartbeat = HasHeartbeat(snapshot);
-            bool wsConnected = IsWebSocketConnected(snapshot);
+            var issues = new HashSet<string>(StringComparer.Ordinal);
 
-            // Caso extremo:
-            // No hay heartbeat registrado.
-            // - Si tampoco hay WS, el dispositivo está realmente Offline.
-            // - Si el WS aparece como activo, el dispositivo sigue vivo pero inconsistente => Degraded.
-            if (!hasHeartbeat)
+            bool wsConnected = snapshot.WsConnected.GetValueOrDefault(false);
+
+            if (snapshot.LastHeartbeatReceivedAtUtc is not DateTime lastHeartbeat)
             {
-                return wsConnected
-                    ? StatusDegraded
-                    : StatusOffline;
+                issues.Add(DeviceIssueCodes.HeartbeatMissing);
+
+                if (!wsConnected)
+                {
+                    issues.Add(DeviceIssueCodes.WsDisconnected);
+                }
+
+                return new DeviceHealthEvaluation
+                {
+                    OperationalStatus = wsConnected ? StatusDegraded : StatusOffline,
+                    Issues = issues.OrderBy(x => x).ToList()
+                };
             }
 
-            TimeSpan heartbeatAge = GetHeartbeatAge(snapshot, utcNow);
-
-            bool heartbeatOffline = IsHeartbeatOffline(heartbeatAge);
-            bool heartbeatDelayed = IsHeartbeatDelayed(heartbeatAge);
-            bool websocketDegraded = IsWebSocketDegraded(snapshot);
-            bool metricsDegraded = IsMetricsDegraded(snapshot);
-
-            // Prioridad 1:
-            // Heartbeat demasiado antiguo.
-            // - Sin WS => Offline
-            // - Con WS => Degraded (sigue vivo, pero el canal HB falló o está desfasado)
-            if (heartbeatOffline)
+            if (snapshot.PreviousHeartbeatReceivedAtUtc.HasValue)
             {
-                return wsConnected
-                    ? StatusDegraded
-                    : StatusOffline;
+                TimeSpan ingestGap = lastHeartbeat - snapshot.PreviousHeartbeatReceivedAtUtc.Value;
+
+                if (ingestGap.TotalSeconds > _options.DelayedThresholdSeconds)
+                {
+                    issues.Add(DeviceIssueCodes.HeartbeatDelayed);
+                }
             }
 
-            // Prioridad 2:
-            // Heartbeat atrasado, pero aún no vencido.
-            // - Si además WS o métricas están mal => Degraded
-            // - Si no => Delayed
-            if (heartbeatDelayed)
+            TimeSpan currentAge = utcNow - lastHeartbeat;
+
+            bool isOfflineByAge = currentAge.TotalSeconds > _options.OfflineThresholdSeconds;
+            bool isDelayedByAge = currentAge.TotalSeconds > _options.DelayedThresholdSeconds;
+
+            if (isOfflineByAge)
             {
-                return (websocketDegraded || metricsDegraded)
-                    ? StatusDegraded
-                    : StatusDelayed;
+                issues.Add(DeviceIssueCodes.HeartbeatMissing);
             }
-
-            // Prioridad 3:
-            // Heartbeat reciente, pero hay degradaciones operativas.
-            if (websocketDegraded || metricsDegraded)
+            else if (isDelayedByAge)
             {
-                return StatusDegraded;
+                issues.Add(DeviceIssueCodes.HeartbeatDelayed);
             }
 
-            // Todo sano.
-            return StatusOnline;
-        }
+            if (!wsConnected)
+            {
+                issues.Add(DeviceIssueCodes.WsDisconnected);
+            }
 
-        private static bool HasHeartbeat(DeviceHeartbeatSnapshot snapshot)
-        {
-            return snapshot.LastHeartbeatReceivedAtUtc.HasValue;
-        }
+            if (snapshot.Rssi.HasValue && snapshot.Rssi.Value <= _options.DegradedRssiThreshold)
+            {
+                issues.Add(DeviceIssueCodes.LowRssi);
+            }
 
-        private static bool IsWebSocketConnected(DeviceHeartbeatSnapshot snapshot)
-        {
-            return snapshot.WsConnected.GetValueOrDefault(false);
-        }
+            if (snapshot.EventQueueSize.HasValue && snapshot.EventQueueSize.Value >= _options.DegradedEventQueueThreshold)
+            {
+                issues.Add(DeviceIssueCodes.HighEventQueue);
+            }
 
-        private static TimeSpan GetHeartbeatAge(DeviceHeartbeatSnapshot snapshot, DateTime utcNow)
-        {
-            return utcNow - snapshot.LastHeartbeatReceivedAtUtc!.Value;
-        }
+            if (snapshot.FreeHeap.HasValue && snapshot.FreeHeap.Value <= _options.DegradedFreeHeapThreshold)
+            {
+                issues.Add(DeviceIssueCodes.LowFreeHeap);
+            }
 
-        private bool IsHeartbeatOffline(TimeSpan heartbeatAge)
-        {
-            return heartbeatAge.TotalSeconds > _options.OfflineThresholdSeconds;
-        }
+            string status;
 
-        private bool IsHeartbeatDelayed(TimeSpan heartbeatAge)
-        {
-            return heartbeatAge.TotalSeconds > _options.DelayedThresholdSeconds;
-        }
+            if (isOfflineByAge)
+            {
+                status = wsConnected ? StatusDegraded : StatusOffline;
+            }
+            else if (issues.Contains(DeviceIssueCodes.HeartbeatDelayed))
+            {
+                status = issues.Count == 1 ? StatusDelayed : StatusDegraded;
+            }
+            else if (issues.Count > 0)
+            {
+                status = StatusDegraded;
+            }
+            else
+            {
+                status = StatusOnline;
+            }
 
-        private static bool IsWebSocketDegraded(DeviceHeartbeatSnapshot snapshot)
-        {
-            return snapshot.WsConnected.HasValue && !snapshot.WsConnected.Value;
-        }
-
-        private bool IsMetricsDegraded(DeviceHeartbeatSnapshot snapshot)
-        {
-            return IsRssiDegraded(snapshot)
-                || IsEventQueueDegraded(snapshot)
-                || IsFreeHeapDegraded(snapshot);
-        }
-
-        private bool IsRssiDegraded(DeviceHeartbeatSnapshot snapshot)
-        {
-            return snapshot.Rssi.HasValue
-                && snapshot.Rssi.Value <= _options.DegradedRssiThreshold;
-        }
-
-        private bool IsEventQueueDegraded(DeviceHeartbeatSnapshot snapshot)
-        {
-            return snapshot.EventQueueSize.HasValue
-                && snapshot.EventQueueSize.Value >= _options.DegradedEventQueueThreshold;
-        }
-
-        private bool IsFreeHeapDegraded(DeviceHeartbeatSnapshot snapshot)
-        {
-            return snapshot.FreeHeap.HasValue
-                && snapshot.FreeHeap.Value <= _options.DegradedFreeHeapThreshold;
+            return new DeviceHealthEvaluation
+            {
+                OperationalStatus = status,
+                Issues = issues.OrderBy(x => x).ToList()
+            };
         }
     }
 }

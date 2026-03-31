@@ -9,15 +9,19 @@ namespace cl.MedelCodeFactory.IoT.HeartBeat.Repositories
 
         Task<bool> HasActiveAssignmentAsync(string deviceId, CancellationToken cancellationToken);
 
+        Task<DateTime?> GetLastHeartbeatReceivedAtUtcAsync(
+            string deviceId,
+            CancellationToken cancellationToken);
+
         Task UpsertHeartbeatCurrentAsync(
             HeartbeatRequestDTO request,
-            string operationalStatus,
+            DeviceHealthEvaluation evaluation,
             DateTime receivedAtUtc,
             CancellationToken cancellationToken);
 
         Task InsertHeartbeatHistoryAsync(
             HeartbeatRequestDTO request,
-            string operationalStatus,
+            DeviceHealthEvaluation evaluation,
             DateTime receivedAtUtc,
             CancellationToken cancellationToken);
 

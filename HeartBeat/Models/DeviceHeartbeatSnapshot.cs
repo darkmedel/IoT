@@ -14,6 +14,8 @@
 
         public string? PersistedOperationalStatus { get; set; }
         public DateTime? LastHeartbeatReceivedAtUtc { get; set; }
+        public DateTime? PreviousHeartbeatReceivedAtUtc { get; set; }
+
         public string? IssuesJson { get; set; }
 
         public int? EmpresaId { get; set; }

@@ -64,7 +64,7 @@ namespace cl.MedelCodeFactory.IoT.HeartBeat.Services
                 WsConnected = request.WsConnected,
                 EventQueueSize = request.EventQueueSize,
                 FreeHeap = request.FreeHeap,
-                LastHeartbeatReceivedAtUtc = receivedAtUtc,
+                ReceivedAtUtc = receivedAtUtc,
                 PreviousHeartbeatReceivedAtUtc = previousHeartbeatReceivedAtUtc
             };
 

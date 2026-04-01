@@ -26,16 +26,16 @@ namespace cl.MedelCodeFactory.IoT.HeartBeat.Services
 
             var issues = new List<string>();
 
-            if (input.LastHeartbeatReceivedAtUtc == default)
+            if (input.ReceivedAtUtc == default)
             {
                 return new DeviceHealthEvaluation
                 {
                     OperationalStatus = "Unknown",
-                    Issues = new List<string> { "MissingLastHeartbeatTimestamp" }
+                    Issues = new List<string> { "MissingReceivedAtUtc" }
                 };
             }
 
-            double ageSeconds = (utcNow - input.LastHeartbeatReceivedAtUtc).TotalSeconds;
+            double ageSeconds = (utcNow - input.ReceivedAtUtc).TotalSeconds;
 
             if (ageSeconds < 0)
             {

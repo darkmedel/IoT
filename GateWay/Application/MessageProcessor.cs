@@ -1,6 +1,7 @@
-﻿using cl.MedelCodeFactory.IoT.GateWay.Models;
+﻿using cl.MedelCodeFactory.IoT.GateWay.Domain;
+using cl.MedelCodeFactory.IoT.GateWay.Infrastructure;
 
-namespace cl.MedelCodeFactory.IoT.GateWay.Services
+namespace cl.MedelCodeFactory.IoT.GateWay.Application
 {
     public class MessageProcessor
     {
@@ -15,45 +16,37 @@ namespace cl.MedelCodeFactory.IoT.GateWay.Services
             _connectionRegistry = connectionRegistry;
         }
 
-        public string Process(string rawMessage, ConnectedDevice device)
+        public Task<string> ProcessAsync(
+            string rawMessage,
+            ConnectedDevice device,
+            CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(rawMessage))
             {
-                return "ERR|EMPTY";
+                return Task.FromResult("ERR|EMPTY");
             }
 
             string[] parts = rawMessage.Split('|', StringSplitOptions.TrimEntries);
 
             if (parts.Length == 0)
             {
-                return "ERR|FORMAT";
+                return Task.FromResult("ERR|FORMAT");
             }
 
             string command = parts[0].ToUpperInvariant();
 
-            switch (command)
+            string response = command switch
             {
-                case "HELLO":
-                    return ProcessHello(parts, device);
+                "HELLO" => ProcessHello(parts, device),
+                "BTN" => ProcessButton(parts, device),
+                "STATUS" => ProcessStatus(parts, device),
+                "PING" => "PONG",
+                "ACK" => ProcessAck(parts, device),
+                "CONFIG_APPLIED" => ProcessConfigApplied(parts, device),
+                _ => $"ERR|UNKNOWN|{command}"
+            };
 
-                case "BTN":
-                    return ProcessButton(parts, device);
-
-                case "STATUS":
-                    return ProcessStatus(parts, device);
-
-                case "PING":
-                    return "PONG";
-
-                case "ACK":
-                    return ProcessAck(parts, device);
-
-                case "CONFIG_APPLIED":
-                    return ProcessConfigApplied(parts, device);
-
-                default:
-                    return $"ERR|UNKNOWN|{command}";
-            }
+            return Task.FromResult(response);
         }
 
         private void EnsureDeviceBound(ConnectedDevice device, string deviceId)

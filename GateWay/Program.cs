@@ -1,5 +1,6 @@
+using cl.MedelCodeFactory.IoT.GateWay.Application;
 using cl.MedelCodeFactory.IoT.GateWay.Endpoints;
-using cl.MedelCodeFactory.IoT.GateWay.Services;
+using cl.MedelCodeFactory.IoT.GateWay.Infrastructure;
 using cl.MedelCodeFactory.IoT.GateWay.WebSockets;
 
 var builder = WebApplication.CreateBuilder(args);

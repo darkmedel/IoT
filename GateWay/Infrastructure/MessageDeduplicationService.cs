@@ -1,6 +1,6 @@
 ﻿using System.Collections.Concurrent;
 
-namespace cl.MedelCodeFactory.IoT.GateWay.Services
+namespace cl.MedelCodeFactory.IoT.GateWay.Infrastructure
 {
     public class MessageDeduplicationService
     {

@@ -1,19 +1,23 @@
-﻿using System.Net.WebSockets;
+﻿using cl.MedelCodeFactory.IoT.GateWay.Application;
+using cl.MedelCodeFactory.IoT.GateWay.Domain;
+using cl.MedelCodeFactory.IoT.GateWay.Infrastructure;
+using System.Net.WebSockets;
 using System.Text;
-using cl.MedelCodeFactory.IoT.GateWay.Models;
-using cl.MedelCodeFactory.IoT.GateWay.Services;
 
 namespace cl.MedelCodeFactory.IoT.GateWay.WebSockets
 {
     public class WebSocketConnectionHandler
     {
+        private readonly ILogger<WebSocketConnectionHandler> _logger;
         private readonly MessageProcessor _messageProcessor;
         private readonly ConnectionRegistry _connectionRegistry;
 
         public WebSocketConnectionHandler(
+            ILogger<WebSocketConnectionHandler> logger,
             MessageProcessor messageProcessor,
             ConnectionRegistry connectionRegistry)
         {
+            _logger = logger;
             _messageProcessor = messageProcessor;
             _connectionRegistry = connectionRegistry;
         }
@@ -21,6 +25,8 @@ namespace cl.MedelCodeFactory.IoT.GateWay.WebSockets
         public async Task HandleAsync(HttpContext context)
         {
             using WebSocket webSocket = await context.WebSockets.AcceptWebSocketAsync();
+
+            CancellationToken cancellationToken = context.RequestAborted;
 
             string connectionId = Guid.NewGuid().ToString("N");
             string remoteIp = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
@@ -35,43 +41,60 @@ namespace cl.MedelCodeFactory.IoT.GateWay.WebSockets
 
             _connectionRegistry.Add(device);
 
-            Console.WriteLine($"[WS] Connected | ConnectionId={connectionId} | IP={remoteIp}");
+            _logger.LogInformation(
+                "[WS] Connected | ConnectionId={connectionId} | IP={remoteIp}",
+                connectionId,
+                remoteIp);
 
             byte[] buffer = new byte[4096];
 
             try
             {
-                while (webSocket.State == WebSocketState.Open)
+                while (webSocket.State == WebSocketState.Open && !cancellationToken.IsCancellationRequested)
                 {
                     WebSocketReceiveResult result = await webSocket.ReceiveAsync(
                         new ArraySegment<byte>(buffer),
-                        CancellationToken.None);
+                        cancellationToken);
 
                     if (result.MessageType == WebSocketMessageType.Close)
                     {
-                        Console.WriteLine($"[WS] Close requested | ConnectionId={connectionId}");
-
-                        await webSocket.CloseAsync(
-                            WebSocketCloseStatus.NormalClosure,
-                            "Closed by client",
-                            CancellationToken.None);
+                        _logger.LogInformation(
+                            "[WS] Close requested | ConnectionId={connectionId} | DeviceId={deviceId}",
+                            connectionId,
+                            string.IsNullOrWhiteSpace(device.DeviceId) ? "(sin bind)" : device.DeviceId);
 
                         break;
                     }
 
                     if (result.MessageType != WebSocketMessageType.Text)
                     {
-                        Console.WriteLine($"[WS] Non-text message ignored | ConnectionId={connectionId}");
+                        _logger.LogWarning(
+                            "[WS] Non-text message ignored | ConnectionId={connectionId} | Type={messageType}",
+                            connectionId,
+                            result.MessageType);
+
                         continue;
                     }
 
-                    string message = await ReadFullMessageAsync(webSocket, buffer, result);
+                    string message = await ReadFullMessageAsync(
+                        webSocket,
+                        buffer,
+                        result,
+                        cancellationToken);
 
-                    Console.WriteLine($"[WS] Received | ConnectionId={connectionId} | Message={message}");
+                    _logger.LogInformation(
+                        "[WS] Received | ConnectionId={connectionId} | DeviceId={deviceId} | Message={message}",
+                        connectionId,
+                        string.IsNullOrWhiteSpace(device.DeviceId) ? "(sin bind)" : device.DeviceId,
+                        message);
 
-                    string response = _messageProcessor.Process(message, device);
+                    string response = await _messageProcessor.ProcessAsync(
+                        message,
+                        device,
+                        cancellationToken);
 
                     if (!string.IsNullOrWhiteSpace(response) &&
+                        !string.Equals(response, "ACK_RECEIVED", StringComparison.OrdinalIgnoreCase) &&
                         webSocket.State == WebSocketState.Open)
                     {
                         byte[] responseBytes = Encoding.UTF8.GetBytes(response);
@@ -80,31 +103,87 @@ namespace cl.MedelCodeFactory.IoT.GateWay.WebSockets
                             new ArraySegment<byte>(responseBytes),
                             WebSocketMessageType.Text,
                             true,
-                            CancellationToken.None);
+                            cancellationToken);
 
-                        Console.WriteLine($"[WS] Sent | ConnectionId={connectionId} | Response={response}");
+                        _logger.LogInformation(
+                            "[WS] Sent | ConnectionId={connectionId} | DeviceId={deviceId} | Response={response}",
+                            connectionId,
+                            string.IsNullOrWhiteSpace(device.DeviceId) ? "(sin bind)" : device.DeviceId,
+                            response);
+                    }
+                    else if (string.Equals(response, "ACK_RECEIVED", StringComparison.OrdinalIgnoreCase))
+                    {
+                        _logger.LogDebug(
+                            "[WS] ACK inbound procesado | ConnectionId={connectionId} | DeviceId={deviceId}",
+                            connectionId,
+                            string.IsNullOrWhiteSpace(device.DeviceId) ? "(sin bind)" : device.DeviceId);
                     }
                 }
             }
+            catch (OperationCanceledException)
+            {
+                _logger.LogInformation(
+                    "[WS] Request aborted / operation canceled | ConnectionId={connectionId} | DeviceId={deviceId}",
+                    connectionId,
+                    string.IsNullOrWhiteSpace(device.DeviceId) ? "(sin bind)" : device.DeviceId);
+            }
             catch (WebSocketException ex)
             {
-                Console.WriteLine($"[WS] Error | ConnectionId={connectionId} | {ex.Message}");
+                _logger.LogWarning(
+                    ex,
+                    "[WS] Error | ConnectionId={connectionId} | DeviceId={deviceId}",
+                    connectionId,
+                    string.IsNullOrWhiteSpace(device.DeviceId) ? "(sin bind)" : device.DeviceId);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[WS] Unexpected error | ConnectionId={connectionId} | {ex}");
+                _logger.LogError(
+                    ex,
+                    "[WS] Unexpected error | ConnectionId={connectionId} | DeviceId={deviceId}",
+                    connectionId,
+                    string.IsNullOrWhiteSpace(device.DeviceId) ? "(sin bind)" : device.DeviceId);
             }
             finally
             {
                 _connectionRegistry.Remove(connectionId);
-                Console.WriteLine($"[WS] Disconnected | ConnectionId={connectionId}");
+
+                _logger.LogInformation(
+                    "[WS] Removed from registry | ConnectionId={connectionId} | DeviceId={deviceId}",
+                    connectionId,
+                    string.IsNullOrWhiteSpace(device.DeviceId) ? "(sin bind)" : device.DeviceId);
+
+                if (webSocket.State == WebSocketState.Open ||
+                    webSocket.State == WebSocketState.CloseReceived)
+                {
+                    try
+                    {
+                        await webSocket.CloseAsync(
+                            WebSocketCloseStatus.NormalClosure,
+                            "Closing",
+                            CancellationToken.None);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(
+                            ex,
+                            "[WS] Failed to close socket cleanly | ConnectionId={connectionId} | DeviceId={deviceId}",
+                            connectionId,
+                            string.IsNullOrWhiteSpace(device.DeviceId) ? "(sin bind)" : device.DeviceId);
+                    }
+                }
+
+                _logger.LogInformation(
+                    "[WS] Disconnected | ConnectionId={connectionId} | DeviceId={deviceId}",
+                    connectionId,
+                    string.IsNullOrWhiteSpace(device.DeviceId) ? "(sin bind)" : device.DeviceId);
             }
         }
 
         private static async Task<string> ReadFullMessageAsync(
             WebSocket webSocket,
             byte[] buffer,
-            WebSocketReceiveResult initialResult)
+            WebSocketReceiveResult initialResult,
+            CancellationToken cancellationToken)
         {
             using var ms = new MemoryStream();
 
@@ -114,7 +193,7 @@ namespace cl.MedelCodeFactory.IoT.GateWay.WebSockets
             {
                 initialResult = await webSocket.ReceiveAsync(
                     new ArraySegment<byte>(buffer),
-                    CancellationToken.None);
+                    cancellationToken);
 
                 ms.Write(buffer, 0, initialResult.Count);
             }

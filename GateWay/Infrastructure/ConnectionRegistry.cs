@@ -1,7 +1,7 @@
-﻿using System.Collections.Concurrent;
-using cl.MedelCodeFactory.IoT.GateWay.Models;
+﻿using cl.MedelCodeFactory.IoT.GateWay.Domain;
+using System.Collections.Concurrent;
 
-namespace cl.MedelCodeFactory.IoT.GateWay.Services
+namespace cl.MedelCodeFactory.IoT.GateWay.Infrastructure
 {
     public class ConnectionRegistry
     {
@@ -43,8 +43,6 @@ namespace cl.MedelCodeFactory.IoT.GateWay.Services
 
             device.DeviceId = deviceId;
 
-            // Si el mismo DeviceId ya estaba asociado a otra conexión,
-            // la sobreescribimos con la más reciente.
             _connectionIdByDeviceId[deviceId] = connectionId;
         }
 
@@ -78,7 +76,7 @@ namespace cl.MedelCodeFactory.IoT.GateWay.Services
 
         public IReadOnlyCollection<ConnectedDevice> GetAll()
         {
-            return _byConnectionId.Values.ToList();
+            return _byConnectionId.Values.ToList().AsReadOnly();
         }
     }
 }

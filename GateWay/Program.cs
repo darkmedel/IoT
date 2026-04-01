@@ -24,6 +24,12 @@ app.MapGet("/", () => Results.Ok(new
     timestampUtc = DateTime.UtcNow
 }));
 
+app.Use(async (context, next) =>
+{
+    Console.WriteLine($"[REQ] {context.Request.Method} {context.Request.Path} | RemoteIp={context.Connection.RemoteIpAddress}");
+    await next();
+});
+
 // WebSocket endpoint
 app.Map("/ws", async context =>
 {

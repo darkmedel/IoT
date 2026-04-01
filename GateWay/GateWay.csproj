@@ -10,4 +10,12 @@
     <ProjectReference Include="..\Common\Common.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Application\" />
+    <Folder Include="Domain\" />
+    <Folder Include="Infrastructure\" />
+    <Folder Include="Contracts\" />
+    <Folder Include="Logging\" />
+  </ItemGroup>
+
 </Project>

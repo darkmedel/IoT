@@ -4,6 +4,6 @@ namespace cl.MedelCodeFactory.IoT.HeartBeat.Services
 {
     public interface IOperationalStatusEvaluator
     {
-        DeviceHealthEvaluation Evaluate(DeviceHeartbeatSnapshot snapshot, DateTime utcNow);
+        DeviceHealthEvaluation Evaluate(HeartbeatEvaluationInput input, DateTime utcNow);
     }
 }

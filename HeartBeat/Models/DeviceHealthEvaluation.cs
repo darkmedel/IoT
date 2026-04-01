@@ -4,20 +4,15 @@ namespace cl.MedelCodeFactory.IoT.HeartBeat.Models
 {
     public sealed class DeviceHealthEvaluation
     {
-        public string OperationalStatus { get; set; } = string.Empty;
+        public string OperationalStatus { get; set; } = "Unknown";
 
-        public List<string> Issues { get; set; } = new();
-
-        public bool HasIssues => Issues != null && Issues.Count > 0;
+        public List<string> Issues { get; set; } = new List<string>();
 
         public string? GetIssuesJson()
         {
-            if (!HasIssues)
-            {
-                return null;
-            }
-
-            return JsonSerializer.Serialize(Issues);
+            return Issues == null || Issues.Count == 0
+                ? null
+                : JsonSerializer.Serialize(Issues);
         }
     }
 }

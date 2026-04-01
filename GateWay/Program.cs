@@ -6,10 +6,10 @@ using cl.MedelCodeFactory.IoT.GateWay.WebSockets;
 var builder = WebApplication.CreateBuilder(args);
 
 // Servicios
-builder.Services.AddSingleton<MessageProcessor>();
-builder.Services.AddSingleton<WebSocketConnectionHandler>();
 builder.Services.AddSingleton<MessageDeduplicationService>();
 builder.Services.AddSingleton<ConnectionRegistry>();
+builder.Services.AddSingleton<MessageProcessor>();
+builder.Services.AddSingleton<WebSocketConnectionHandler>();
 builder.Services.AddSingleton<DeviceCommandSender>();
 
 var app = builder.Build();
@@ -25,30 +25,46 @@ app.MapGet("/", () => Results.Ok(new
     timestampUtc = DateTime.UtcNow
 }));
 
+// Logging básico de requests
 app.Use(async (context, next) =>
 {
-    Console.WriteLine($"[REQ] {context.Request.Method} {context.Request.Path} | RemoteIp={context.Connection.RemoteIpAddress}");
+    app.Logger.LogInformation(
+        "[REQ] {method} {path} | RemoteIp={remoteIp}",
+        context.Request.Method,
+        context.Request.Path,
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown");
+
     await next();
 });
 
 // WebSocket endpoint
 app.Map("/ws", async context =>
 {
-    Console.WriteLine($"[HTTP] /ws hit | RemoteIp={context.Connection.RemoteIpAddress} | IsWebSocket={context.WebSockets.IsWebSocketRequest}");
+    app.Logger.LogInformation(
+        "[HTTP] /ws hit | RemoteIp={remoteIp} | IsWebSocket={isWebSocket}",
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        context.WebSockets.IsWebSocketRequest);
 
     foreach (var header in context.Request.Headers)
     {
-        Console.WriteLine($"[HTTP] Header | {header.Key}: {header.Value}");
+        app.Logger.LogDebug(
+            "[HTTP] Header | {key}: {value}",
+            header.Key,
+            header.Value.ToString());
     }
 
     if (!context.WebSockets.IsWebSocketRequest)
     {
+        app.Logger.LogWarning(
+            "[WS] Invalid upgrade request received on /ws | RemoteIp={remoteIp}",
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown");
+
         context.Response.StatusCode = StatusCodes.Status400BadRequest;
         await context.Response.WriteAsync("WebSocket request expected.");
         return;
     }
 
-    Console.WriteLine("[WS] Valid WebSocket upgrade request received.");
+    app.Logger.LogInformation("[WS] Valid WebSocket upgrade request received.");
 
     var handler = context.RequestServices.GetRequiredService<WebSocketConnectionHandler>();
     await handler.HandleAsync(context);

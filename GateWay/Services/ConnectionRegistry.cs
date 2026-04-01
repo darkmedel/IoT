@@ -5,8 +5,9 @@ namespace cl.MedelCodeFactory.IoT.GateWay.Services
 {
     public class ConnectionRegistry
     {
-        private readonly ConcurrentDictionary<string, ConnectedDevice> _byConnectionId =
-            new ConcurrentDictionary<string, ConnectedDevice>();
+        private readonly ConcurrentDictionary<string, ConnectedDevice> _byConnectionId = new();
+        private readonly ConcurrentDictionary<string, string> _connectionIdByDeviceId =
+            new(StringComparer.OrdinalIgnoreCase);
 
         public void Add(ConnectedDevice device)
         {
@@ -15,22 +16,64 @@ namespace cl.MedelCodeFactory.IoT.GateWay.Services
 
         public void Remove(string connectionId)
         {
-            _byConnectionId.TryRemove(connectionId, out _);
+            if (_byConnectionId.TryRemove(connectionId, out var removed))
+            {
+                if (!string.IsNullOrWhiteSpace(removed.DeviceId))
+                {
+                    _connectionIdByDeviceId.TryGetValue(removed.DeviceId, out var mappedConnectionId);
+
+                    if (string.Equals(mappedConnectionId, connectionId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _connectionIdByDeviceId.TryRemove(removed.DeviceId, out _);
+                    }
+                }
+            }
         }
 
-        public void UpdateDeviceId(string connectionId, string deviceId)
+        public void BindDevice(string connectionId, string deviceId)
         {
-            if (_byConnectionId.TryGetValue(connectionId, out var device))
-            {
-                device.DeviceId = deviceId;
-            }
+            if (string.IsNullOrWhiteSpace(connectionId))
+                throw new ArgumentException("connectionId is required.", nameof(connectionId));
+
+            if (string.IsNullOrWhiteSpace(deviceId))
+                throw new ArgumentException("deviceId is required.", nameof(deviceId));
+
+            if (!_byConnectionId.TryGetValue(connectionId, out var device))
+                return;
+
+            device.DeviceId = deviceId;
+
+            // Si el mismo DeviceId ya estaba asociado a otra conexión,
+            // la sobreescribimos con la más reciente.
+            _connectionIdByDeviceId[deviceId] = connectionId;
+        }
+
+        public ConnectedDevice? GetByConnectionId(string connectionId)
+        {
+            return _byConnectionId.TryGetValue(connectionId, out var device)
+                ? device
+                : null;
         }
 
         public ConnectedDevice? GetByDeviceId(string deviceId)
         {
-            return _byConnectionId.Values.FirstOrDefault(x =>
-                !string.IsNullOrWhiteSpace(x.DeviceId) &&
-                x.DeviceId.Equals(deviceId, StringComparison.OrdinalIgnoreCase));
+            if (string.IsNullOrWhiteSpace(deviceId))
+                return null;
+
+            if (!_connectionIdByDeviceId.TryGetValue(deviceId, out var connectionId))
+                return null;
+
+            return _byConnectionId.TryGetValue(connectionId, out var device)
+                ? device
+                : null;
+        }
+
+        public bool IsConnected(string deviceId)
+        {
+            var device = GetByDeviceId(deviceId);
+
+            return device?.WebSocket != null &&
+                   device.WebSocket.State == System.Net.WebSockets.WebSocketState.Open;
         }
 
         public IReadOnlyCollection<ConnectedDevice> GetAll()

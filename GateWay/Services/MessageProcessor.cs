@@ -47,8 +47,33 @@ namespace cl.MedelCodeFactory.IoT.GateWay.Services
 
                 case "ACK":
                     return ProcessAck(parts, device);
+
+                case "CONFIG_APPLIED":
+                    return ProcessConfigApplied(parts, device);
+
                 default:
                     return $"ERR|UNKNOWN|{command}";
+            }
+        }
+
+        private void EnsureDeviceBound(ConnectedDevice device, string deviceId)
+        {
+            if (string.IsNullOrWhiteSpace(deviceId))
+            {
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(device.DeviceId))
+            {
+                device.DeviceId = deviceId;
+                _connectionRegistry.BindDevice(device.ConnectionId, device.DeviceId);
+                return;
+            }
+
+            if (!string.Equals(device.DeviceId, deviceId, StringComparison.OrdinalIgnoreCase))
+            {
+                device.DeviceId = deviceId;
+                _connectionRegistry.BindDevice(device.ConnectionId, device.DeviceId);
             }
         }
 
@@ -59,12 +84,31 @@ namespace cl.MedelCodeFactory.IoT.GateWay.Services
                 return "ERR|HELLO|DEVICEID";
             }
 
-            device.DeviceId = parts[1];
-            _connectionRegistry.UpdateDeviceId(device.ConnectionId, device.DeviceId);
+            string deviceId = parts[1];
+
+            EnsureDeviceBound(device, deviceId);
 
             Console.WriteLine($"[MSG] HELLO | DeviceId={device.DeviceId} | IP={device.RemoteIp}");
 
             return $"ACK|HELLO|{device.DeviceId}";
+        }
+
+        private string ProcessStatus(string[] parts, ConnectedDevice device)
+        {
+            if (parts.Length < 2 || string.IsNullOrWhiteSpace(parts[1]))
+            {
+                return "ERR|STATUS|DEVICEID";
+            }
+
+            string deviceId = parts[1];
+
+            EnsureDeviceBound(device, deviceId);
+
+            string payload = string.Join('|', parts);
+
+            Console.WriteLine($"[MSG] STATUS | DeviceId={device.DeviceId} | Payload={payload}");
+
+            return "ACK|STATUS";
         }
 
         private string ProcessButton(string[] parts, ConnectedDevice device)
@@ -76,54 +120,66 @@ namespace cl.MedelCodeFactory.IoT.GateWay.Services
 
             string deviceId = parts[1];
             string msgId = parts[2];
-            string timestamp = parts[3];
-            string button = parts[4];
+            string uptime = parts[3];
+            string buttonNumber = parts[4];
 
-            if (string.IsNullOrWhiteSpace(device.DeviceId))
+            if (string.IsNullOrWhiteSpace(deviceId))
             {
-                device.DeviceId = deviceId;
-                _connectionRegistry.UpdateDeviceId(device.ConnectionId, device.DeviceId);
+                return "ERR|BTN|DEVICEID";
             }
 
-            if (_deduplicationService.IsDuplicate(deviceId, msgId))
+            if (string.IsNullOrWhiteSpace(msgId))
+            {
+                return "ERR|BTN|MSGID";
+            }
+
+            EnsureDeviceBound(device, deviceId);
+
+            bool isDuplicate = _deduplicationService.IsDuplicate(deviceId, msgId);
+            if (isDuplicate)
             {
                 Console.WriteLine($"[MSG] BTN DUPLICATE | DeviceId={deviceId} | MsgId={msgId}");
-                return $"ACK|BTN|{msgId}";
+                return $"ACK|BTN|{msgId}|DUPLICATE";
             }
 
             _deduplicationService.MarkProcessed(deviceId, msgId);
 
-            Console.WriteLine($"[MSG] BTN | DeviceId={deviceId} | MsgId={msgId} | Timestamp={timestamp} | Button={button}");
+            Console.WriteLine(
+                $"[MSG] BTN | DeviceId={deviceId} | MsgId={msgId} | Uptime={uptime} | Button={buttonNumber}");
 
             return $"ACK|BTN|{msgId}";
         }
 
-        private string ProcessStatus(string[] parts, ConnectedDevice device)
-        {
-            if (parts.Length < 2 || string.IsNullOrWhiteSpace(parts[1]))
-            {
-                return "ERR|STATUS|DEVICEID";
-            }
-
-            if (string.IsNullOrWhiteSpace(device.DeviceId))
-            {
-                device.DeviceId = parts[1];
-                _connectionRegistry.UpdateDeviceId(device.ConnectionId, device.DeviceId);
-            }
-
-            string payload = string.Join('|', parts);
-
-            Console.WriteLine($"[MSG] STATUS | DeviceId={device.DeviceId} | Payload={payload}");
-
-            return "ACK|STATUS";
-        }
-
         private string ProcessAck(string[] parts, ConnectedDevice device)
         {
-            Console.WriteLine($"[MSG] ACK | DeviceId={device.DeviceId} | Payload={string.Join('|', parts)}");
+            string payload = string.Join('|', parts);
 
-            // Por ahora no respondemos nada a ACK
-            return string.Empty;
+            Console.WriteLine($"[MSG] ACK | DeviceId={device.DeviceId ?? "UNKNOWN"} | Payload={payload}");
+
+            return "ACK_RECEIVED";
+        }
+
+        private string ProcessConfigApplied(string[] parts, ConnectedDevice device)
+        {
+            if (parts.Length < 3)
+            {
+                return "ERR|CONFIG_APPLIED|FORMAT";
+            }
+
+            string deviceId = parts[1];
+            string configVersion = parts[2];
+
+            if (string.IsNullOrWhiteSpace(deviceId))
+            {
+                return "ERR|CONFIG_APPLIED|DEVICEID";
+            }
+
+            EnsureDeviceBound(device, deviceId);
+
+            Console.WriteLine(
+                $"[MSG] CONFIG_APPLIED | DeviceId={deviceId} | ConfigVersion={configVersion}");
+
+            return $"ACK|CONFIG_APPLIED|{configVersion}";
         }
     }
 }

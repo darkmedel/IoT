@@ -1,4 +1,5 @@
 using cl.MedelCodeFactory.IoT.GateWay.Application;
+using cl.MedelCodeFactory.IoT.GateWay.Contracts;
 using cl.MedelCodeFactory.IoT.GateWay.Endpoints;
 using cl.MedelCodeFactory.IoT.GateWay.Infrastructure;
 using cl.MedelCodeFactory.IoT.GateWay.WebSockets;
@@ -8,6 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Servicios
 builder.Services.AddSingleton<MessageDeduplicationService>();
 builder.Services.AddSingleton<ConnectionRegistry>();
+builder.Services.AddSingleton<IButtonEventRepository, SqlButtonEventRepository>();
 builder.Services.AddSingleton<MessageProcessor>();
 builder.Services.AddSingleton<WebSocketConnectionHandler>();
 builder.Services.AddSingleton<DeviceCommandSender>();

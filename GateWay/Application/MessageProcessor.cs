@@ -1,5 +1,7 @@
-﻿using cl.MedelCodeFactory.IoT.GateWay.Domain;
+﻿using cl.MedelCodeFactory.IoT.GateWay.Contracts;
+using cl.MedelCodeFactory.IoT.GateWay.Domain;
 using cl.MedelCodeFactory.IoT.GateWay.Infrastructure;
+using System.Globalization;
 
 namespace cl.MedelCodeFactory.IoT.GateWay.Application
 {
@@ -8,18 +10,21 @@ namespace cl.MedelCodeFactory.IoT.GateWay.Application
         private readonly ILogger<MessageProcessor> _logger;
         private readonly MessageDeduplicationService _deduplicationService;
         private readonly ConnectionRegistry _connectionRegistry;
+        private readonly IButtonEventRepository _buttonEventRepository;
 
         public MessageProcessor(
             ILogger<MessageProcessor> logger,
             MessageDeduplicationService deduplicationService,
-            ConnectionRegistry connectionRegistry)
+            ConnectionRegistry connectionRegistry,
+            IButtonEventRepository buttonEventRepository)
         {
             _logger = logger;
             _deduplicationService = deduplicationService;
             _connectionRegistry = connectionRegistry;
+            _buttonEventRepository = buttonEventRepository;
         }
 
-        public Task<string> ProcessAsync(
+        public async Task<string> ProcessAsync(
             string rawMessage,
             ConnectedDevice device,
             CancellationToken cancellationToken = default)
@@ -27,7 +32,7 @@ namespace cl.MedelCodeFactory.IoT.GateWay.Application
             if (string.IsNullOrWhiteSpace(rawMessage))
             {
                 _logger.LogWarning("[MSG] Empty message received.");
-                return Task.FromResult("ERR|EMPTY");
+                return "ERR|EMPTY";
             }
 
             string[] parts = rawMessage.Split('|', StringSplitOptions.TrimEntries);
@@ -35,23 +40,21 @@ namespace cl.MedelCodeFactory.IoT.GateWay.Application
             if (parts.Length == 0)
             {
                 _logger.LogWarning("[MSG] Invalid message format. RawMessage={rawMessage}", rawMessage);
-                return Task.FromResult("ERR|FORMAT");
+                return "ERR|FORMAT";
             }
 
             string command = parts[0].ToUpperInvariant();
 
-            string response = command switch
+            return command switch
             {
                 "HELLO" => ProcessHello(parts, device),
-                "BTN" => ProcessButton(parts, device),
+                "BTN" => await ProcessButtonAsync(parts, rawMessage, device, cancellationToken),
                 "STATUS" => ProcessStatus(parts, device),
                 "PING" => "PONG",
                 "ACK" => ProcessAck(parts, device),
                 "CONFIG_APPLIED" => ProcessConfigApplied(parts, device),
                 _ => $"ERR|UNKNOWN|{command}"
             };
-
-            return Task.FromResult(response);
         }
 
         private void EnsureDeviceBound(ConnectedDevice device, string deviceId)
@@ -131,7 +134,11 @@ namespace cl.MedelCodeFactory.IoT.GateWay.Application
             return "ACK|STATUS";
         }
 
-        private string ProcessButton(string[] parts, ConnectedDevice device)
+        private async Task<string> ProcessButtonAsync(
+            string[] parts,
+            string rawMessage,
+            ConnectedDevice device,
+            CancellationToken cancellationToken)
         {
             if (parts.Length < 5)
             {
@@ -140,9 +147,9 @@ namespace cl.MedelCodeFactory.IoT.GateWay.Application
             }
 
             string deviceId = parts[1];
-            string msgId = parts[2];
-            string uptime = parts[3];
-            string buttonNumber = parts[4];
+            string msgIdRaw = parts[2];
+            string uptimeRaw = parts[3];
+            string buttonNumberRaw = parts[4];
 
             if (string.IsNullOrWhiteSpace(deviceId))
             {
@@ -150,29 +157,89 @@ namespace cl.MedelCodeFactory.IoT.GateWay.Application
                 return "ERR|BTN|DEVICEID";
             }
 
-            if (string.IsNullOrWhiteSpace(msgId))
+            if (!long.TryParse(msgIdRaw, NumberStyles.None, CultureInfo.InvariantCulture, out long msgId))
             {
-                _logger.LogWarning("[MSG] BTN invalid: empty msgId. DeviceId={deviceId}", deviceId);
+                _logger.LogWarning(
+                    "[MSG] BTN invalid: MsgId is not numeric. DeviceId={deviceId} | MsgId={msgId}",
+                    deviceId,
+                    msgIdRaw);
+
                 return "ERR|BTN|MSGID";
+            }
+
+            if (!long.TryParse(uptimeRaw, NumberStyles.None, CultureInfo.InvariantCulture, out long uptime))
+            {
+                _logger.LogWarning(
+                    "[MSG] BTN invalid: Uptime is not numeric. DeviceId={deviceId} | Uptime={uptime}",
+                    deviceId,
+                    uptimeRaw);
+
+                return "ERR|BTN|UPTIME";
+            }
+
+            if (!int.TryParse(buttonNumberRaw, NumberStyles.Integer, CultureInfo.InvariantCulture, out int buttonNumber))
+            {
+                _logger.LogWarning(
+                    "[MSG] BTN invalid: ButtonNumber is not numeric. DeviceId={deviceId} | Button={button}",
+                    deviceId,
+                    buttonNumberRaw);
+
+                return "ERR|BTN|BUTTON";
             }
 
             EnsureDeviceBound(device, deviceId);
 
-            bool isDuplicate = _deduplicationService.IsDuplicate(deviceId, msgId);
-            if (isDuplicate)
+            if (_deduplicationService.IsDuplicate(deviceId, msgIdRaw))
             {
                 _logger.LogWarning(
-                    "[MSG] BTN DUPLICATE | DeviceId={deviceId} | MsgId={msgId}",
+                    "[MSG] BTN DUPLICATE (memory) | DeviceId={deviceId} | MsgId={msgId}",
                     deviceId,
                     msgId);
 
-                return $"ACK|BTN|{msgId}|DUPLICATE";
+                return $"ACK|BTN|{msgId}";
             }
 
-            _deduplicationService.MarkProcessed(deviceId, msgId);
+            var buttonEvent = new DeviceButtonEvent
+            {
+                DeviceId = deviceId,
+                MsgId = msgId,
+                Uptime = uptime,
+                ButtonNumber = buttonNumber,
+                ReceivedAtUtc = DateTime.UtcNow,
+                RawMessage = rawMessage,
+                ConnectionId = device.ConnectionId,
+                RemoteIp = device.RemoteIp
+            };
+
+            ButtonEventSaveResult saveResult =
+                await _buttonEventRepository.SaveAsync(buttonEvent, cancellationToken);
+
+            if (!saveResult.Success)
+            {
+                _logger.LogError(
+                    "[MSG] BTN persistence failed | DeviceId={deviceId} | MsgId={msgId}",
+                    deviceId,
+                    msgId);
+
+                return "ERR|BTN|PERSISTENCE";
+            }
+
+            _deduplicationService.MarkProcessed(deviceId, msgIdRaw);
+
+            if (saveResult.IsDuplicate)
+            {
+                _logger.LogWarning(
+                    "[MSG] BTN DUPLICATE (sql) | DeviceId={deviceId} | MsgId={msgId} | Uptime={uptime} | Button={buttonNumber}",
+                    deviceId,
+                    msgId,
+                    uptime,
+                    buttonNumber);
+
+                return $"ACK|BTN|{msgId}";
+            }
 
             _logger.LogInformation(
-                "[MSG] BTN | DeviceId={deviceId} | MsgId={msgId} | Uptime={uptime} | Button={buttonNumber}",
+                "[MSG] BTN persisted | DeviceId={deviceId} | MsgId={msgId} | Uptime={uptime} | Button={buttonNumber}",
                 deviceId,
                 msgId,
                 uptime,

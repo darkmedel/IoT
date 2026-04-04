@@ -1,8 +1,11 @@
 using cl.MedelCodeFactory.IoT.Bifrost.Application;
 using cl.MedelCodeFactory.IoT.Bifrost.Infrastructure;
 using cl.MedelCodeFactory.IoT.Bifrost.WebSockets;
+using cl.MedelCodeFactory.IoT.Bifrost.Contracts;
+using cl.MedelCodeFactory.IoT.Bifrost.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.UseUrls("http://0.0.0.0:5000");
 
 builder.Services.AddEndpointsApiExplorer();
 
@@ -11,6 +14,7 @@ builder.Services.AddSingleton<ConnectionRegistry>();
 builder.Services.AddSingleton<MessageProcessor>();
 builder.Services.AddSingleton<WebSocketConnectionHandler>();
 builder.Services.AddSingleton<DeviceCommandSender>();
+builder.Services.AddSingleton<IButtonEventRepository, NullButtonEventRepository>();
 
 var app = builder.Build();
 

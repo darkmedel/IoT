@@ -52,9 +52,9 @@ namespace cl.MedelCodeFactory.IoT.Almenaras.Services
             DateTime receivedAtUtc = DateTime.UtcNow;
 
             DateTime? previousHeartbeatReceivedAtUtc =
-                await _repository.GetLastHeartbeatReceivedAtUtcAsync(
-                    request.DeviceId,
-                    cancellationToken);
+                        await _repository.GetLastHeartbeatReceivedAtUtcAsync(
+                            request.DeviceId,
+                            CancellationToken.None);
 
             var evaluationInput = new HeartbeatEvaluationInput
             {
@@ -75,13 +75,13 @@ namespace cl.MedelCodeFactory.IoT.Almenaras.Services
                 request,
                 evaluation,
                 receivedAtUtc,
-                cancellationToken);
+                CancellationToken.None);
 
             await _repository.InsertHeartbeatHistoryAsync(
                 request,
                 evaluation,
                 receivedAtUtc,
-                cancellationToken);
+                CancellationToken.None);
 
             string? issuesJson = evaluation.GetIssuesJson();
 

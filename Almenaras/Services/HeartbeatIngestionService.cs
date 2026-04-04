@@ -1,20 +1,23 @@
-﻿using cl.MedelCodeFactory.IoT.Common.Contracts.Heartbeat;
+﻿using cl.MedelCodeFactory.IoT.Almenaras.DTOs;
+using cl.MedelCodeFactory.IoT.Almenaras.Models;
+using cl.MedelCodeFactory.IoT.Almenaras.Repositories;
 
 namespace cl.MedelCodeFactory.IoT.Almenaras.Services
 {
-    public class HeartbeatIngestionService
+    public sealed class HeartbeatIngestionService
     {
-        public Task<HeartbeatResponse> ProcessAsync(HeartbeatRequest request)
-        {
-            var response = new HeartbeatResponse
-            {
-                Success = true,
-                DeviceId = request.DeviceId,
-                OperationalStatus = "Online",
-                Message = "Heartbeat processed."
-            };
+        private readonly IHeartbeatService _heartbeatService;
 
-            return Task.FromResult(response);
+        public HeartbeatIngestionService(IHeartbeatService heartbeatService)
+        {
+            _heartbeatService = heartbeatService;
+        }
+
+        public Task<HeartbeatProcessResult> ProcessAsync(
+            HeartbeatRequestDTO request,
+            CancellationToken cancellationToken)
+        {
+            return _heartbeatService.ProcessAsync(request, cancellationToken);
         }
     }
 }

@@ -1,0 +1,117 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WatchTower</title>
+    <link rel="stylesheet" href="/css/site.css" />
+</head>
+<body>
+    <div class="app-shell">
+        <header class="topbar">
+            <div class="topbar-left">
+                <h1>WatchTower</h1>
+                <p>Monitoreo operativo de dispositivos IoT</p>
+            </div>
+            <div class="topbar-right">
+                <button id="refreshButton" class="btn btn-primary" type="button">Actualizar</button>
+            </div>
+        </header>
+
+        <main class="layout">
+            <section class="panel panel-main">
+                <div class="panel-header">
+                    <h2>Dispositivos</h2>
+                    <div class="filters">
+                        <label>
+                            <span>Estado</span>
+                            <select id="statusFilter">
+                                <option value="">Todos</option>
+                                <option value="Online">Online</option>
+                                <option value="Degraded">Degraded</option>
+                                <option value="Offline">Offline</option>
+                                <option value="Delayed">Delayed</option>
+                            </select>
+                        </label>
+
+                        <label>
+                            <span>Empresa</span>
+                            <select id="empresaFilter">
+                                <option value="">Todas</option>
+                            </select>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="panel-body">
+                    <div id="devicesMessage" class="message"></div>
+
+                    <div class="table-wrap">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>DeviceId</th>
+                                    <th>Empresa</th>
+                                    <th>Estado</th>
+                                    <th>Último heartbeat</th>
+                                    <th>RSSI</th>
+                                    <th>WS</th>
+                                    <th>Cola</th>
+                                    <th>FreeHeap</th>
+                                </tr>
+                            </thead>
+                            <tbody id="devicesTableBody">
+                                <tr>
+                                    <td colspan="8" class="empty-cell">Cargando dispositivos...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <aside class="sidebar">
+                <section class="panel">
+                    <div class="panel-header">
+                        <h2>Detalle</h2>
+                    </div>
+                    <div class="panel-body">
+                        <div id="deviceDetail" class="detail-empty">
+                            Selecciona un dispositivo para ver su detalle.
+                        </div>
+                    </div>
+                </section>
+
+                <section class="panel">
+                    <div class="panel-header">
+                        <h2>Histórico</h2>
+                    </div>
+                    <div class="panel-body">
+                        <div id="historyMessage" class="message"></div>
+                        <div class="history-wrap">
+                            <table class="data-table data-table-compact">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Estado</th>
+                                        <th>RSSI</th>
+                                        <th>WS</th>
+                                        <th>Cola</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="historyTableBody">
+                                    <tr>
+                                        <td colspan="5" class="empty-cell">Sin selección.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+            </aside>
+        </main>
+    </div>
+
+    <script src="/js/app.js"></script>
+</body>
+</html>

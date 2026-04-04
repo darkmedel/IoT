@@ -19,7 +19,17 @@ var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI();
 
-app.MapGet("/", () => Results.Ok(new
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
+app.MapGet("/health", () => Results.Ok(new
+{
+    service = "IoT.WatchTower",
+    status = "Healthy",
+    timestampUtc = DateTime.UtcNow
+}));
+
+app.MapGet("/api", () => Results.Ok(new
 {
     service = "IoT.WatchTower",
     status = "Healthy",
@@ -35,13 +45,6 @@ app.MapGet("/", () => Results.Ok(new
         "GET /api/devices/{deviceId}",
         "GET /api/devices/{deviceId}/history?limit=100"
     }
-}));
-
-app.MapGet("/health", () => Results.Ok(new
-{
-    service = "IoT.WatchTower",
-    status = "Healthy",
-    timestampUtc = DateTime.UtcNow
 }));
 
 app.MapDeviceStatusQueryEndpoints();

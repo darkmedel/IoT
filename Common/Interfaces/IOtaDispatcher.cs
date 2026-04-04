@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace cl.MedelCodeFactory.IoT.Common.Contracts.Buttons
+namespace Common.Interfaces
 {
-    internal class ButtonConfigRequest
+    internal class IOtaDispatcher
     {
     }
 }

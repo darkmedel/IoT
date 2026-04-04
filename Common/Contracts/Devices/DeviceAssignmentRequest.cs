@@ -1,12 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace cl.MedelCodeFactory.IoT.Common.Contracts.Devices
+﻿namespace cl.MedelCodeFactory.IoT.Common.Contracts.Devices
 {
-    internal class DeviceAssignmentRequest
+    public class DeviceAssignmentRequest
     {
+        public string DeviceId { get; set; }
+        public int EmpresaId { get; set; }
+        public string NombreDispositivo { get; set; }
+        public string Descripcion { get; set; }
     }
 }

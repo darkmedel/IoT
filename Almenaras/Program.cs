@@ -1,99 +1,62 @@
-﻿using cl.MedelCodeFactory.IoT.Almenaras.Configuration;
-using cl.MedelCodeFactory.IoT.Almenaras.DTOs;
+﻿using cl.MedelCodeFactory.IoT.Almenaras.Options;
 using cl.MedelCodeFactory.IoT.Almenaras.Repositories;
 using cl.MedelCodeFactory.IoT.Almenaras.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ================================
-// Configuration
-// ================================
-
-builder.Services.Configure<HeartbeatOptions>(
-    builder.Configuration.GetSection("Heartbeat"));
-
-// ================================
-// Logging
-// ================================
-
-builder.Logging.ClearProviders();
-builder.Logging.AddConsole();
-
-// ================================
-// DI - Repositories
-// ================================
-
-builder.Services.AddScoped<IHeartbeatRepository, SqlHeartbeatRepository>();
-
-// ================================
-// DI - Services
-// ================================
-
-builder.Services.AddScoped<IHeartbeatService, HeartbeatService>();
-builder.Services.AddScoped<IOperationalStatusEvaluator, OperationalStatusEvaluator>();
-
-// ================================
-// Swagger (opcional pero recomendado)
-// ================================
-
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// ================================
-// Build
-// ================================
+builder.Services.Configure<HeartbeatRulesOptions>(
+    builder.Configuration.GetSection("HeartbeatRules"));
+
+builder.Services.AddSingleton<IHeartbeatRepository, SqlHeartbeatRepository>();
+builder.Services.AddSingleton<HeartbeatStatusEvaluator>();
+builder.Services.AddSingleton<HeartbeatIngestionService>();
 
 var app = builder.Build();
 
-// ================================
-// Middleware
-// ================================
+app.UseSwagger();
+app.UseSwaggerUI();
 
-if (app.Environment.IsDevelopment())
+app.MapGet("/", () => Results.Ok(new
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+    service = "IoT.Almenaras",
+    status = "Healthy",
+    timestampUtc = DateTime.UtcNow
+}));
 
-// ================================
-// Endpoints
-// ================================
-
-app.MapGet("/health", () =>
+app.MapGet("/health", () => Results.Ok(new
 {
-    return Results.Ok(new
-    {
-        status = "ok",
-        service = "IoT.HeartBeat",
-        timestamp = DateTime.UtcNow
-    });
-});
+    service = "IoT.Almenaras",
+    status = "Healthy",
+    timestampUtc = DateTime.UtcNow
+}));
 
 app.MapPost("/heartbeat", async (
-    HeartbeatRequestDTO request,
-    IHeartbeatService service,
-    CancellationToken cancellationToken) =>
+    cl.MedelCodeFactory.IoT.Common.Contracts.Heartbeat.HeartbeatRequest request,
+    HeartbeatIngestionService service) =>
 {
-    var result = await service.ProcessAsync(request, cancellationToken);
+    var result = await service.ProcessAsync(request);
+    return Results.Ok(result);
+});
 
-    if (!result.Success)
-    {
-        return Results.Json(
-            new
-            {
-                code = result.Code,
-                message = result.Message,
-                deviceId = result.DeviceId
-            },
-            statusCode: result.StatusCode);
-    }
+app.MapGet("/devices/{deviceId}", async (string deviceId, IHeartbeatRepository repository) =>
+{
+    var device = await repository.GetCurrentByDeviceIdAsync(deviceId);
+    return device is null ? Results.NotFound() : Results.Ok(device);
+});
 
-    return Results.Ok(new HeartbeatAckResponseDTO
-    {
-        DeviceId = result.DeviceId!,
-        Status = result.OperationalStatus!,
-        ReceivedAtUtc = result.ReceivedAtUtc ?? DateTime.UtcNow
-    });
+app.MapGet("/devices/offline", async (IHeartbeatRepository repository) =>
+{
+    var devices = await repository.GetOfflineDevicesAsync();
+    return Results.Ok(devices);
+});
+
+app.MapGet("/devices/degraded", async (IHeartbeatRepository repository) =>
+{
+    var devices = await repository.GetDegradedDevicesAsync();
+    return Results.Ok(devices);
 });
 
 app.Run();

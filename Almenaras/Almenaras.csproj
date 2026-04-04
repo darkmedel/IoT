@@ -7,13 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Options\**" />
-    <Content Remove="Options\**" />
-    <EmbeddedResource Remove="Options\**" />
-    <None Remove="Options\**" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj" />
   </ItemGroup>
 

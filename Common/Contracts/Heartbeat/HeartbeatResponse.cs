@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace cl.MedelCodeFactory.IoT.Common.Contracts.Ota
+namespace Common.Contracts.Heartbeat
 {
-    internal class OtaRequest
+    internal class HeartbeatResponse
     {
     }
 }

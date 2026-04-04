@@ -1,12 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace cl.MedelCodeFactory.IoT.Common.Contracts.Devices
+﻿namespace cl.MedelCodeFactory.IoT.Common.Contracts.Devices
 {
-    internal class DeviceRegistrationRequest
+    public class DeviceRegistrationRequest
     {
+        public string DeviceId { get; set; }
+        public int TipoHardwareId { get; set; }
+        public string Nombre { get; set; }
+        public string Descripcion { get; set; }
+        public string SerialNumber { get; set; }
+        public string FirmwareVersion { get; set; }
+        public string MacAddress { get; set; }
     }
 }

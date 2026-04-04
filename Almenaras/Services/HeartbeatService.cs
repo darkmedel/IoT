@@ -1,8 +1,8 @@
-﻿using Almenaras.DTOs;
-using Almenaras.Models;
-using Almenaras.Repositories;
+﻿using cl.MedelCodeFactory.IoT.Almenaras.DTOs;
+using cl.MedelCodeFactory.IoT.Almenaras.Models;
+using cl.MedelCodeFactory.IoT.Almenaras.Repositories;
 
-namespace Almenaras.Services
+namespace cl.MedelCodeFactory.IoT.Almenaras.Services
 {
     public sealed class HeartbeatService : IHeartbeatService
     {

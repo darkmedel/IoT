@@ -1,4 +1,4 @@
-﻿namespace Citadel.Infrastructure.Persistence.Repositories
+﻿namespace cl.MedelCodeFactory.IoT.Citadel.Infrastructure.Persistence.Repositories
 {
     public class FirmwareRepository
     {

@@ -1,6 +1,6 @@
-﻿using Almenaras.Models;
+﻿using cl.MedelCodeFactory.IoT.Almenaras.Models;
 
-namespace Almenaras.Services
+namespace cl.MedelCodeFactory.IoT.Almenaras.Services
 {
     public interface IOperationalStatusEvaluator
     {

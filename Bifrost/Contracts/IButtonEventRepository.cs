@@ -1,6 +1,6 @@
-﻿using Bifrost.Domain;
+﻿using cl.MedelCodeFactory.IoT.Bifrost.Domain;
 
-namespace Bifrost.Contracts
+namespace cl.MedelCodeFactory.IoT.Bifrost.Contracts
 {
     public interface IButtonEventRepository
     {

@@ -1,9 +1,9 @@
 ﻿using System.Net.WebSockets;
 using System.Text;
-using Bifrost.Domain;
-using Bifrost.Infrastructure;
+using cl.MedelCodeFactory.IoT.Bifrost.Domain;
+using cl.MedelCodeFactory.IoT.Bifrost.Infrastructure;
 
-namespace Bifrost.Application
+namespace cl.MedelCodeFactory.IoT.Bifrost.Application
 {
     public class DeviceCommandSender
     {

@@ -1,8 +1,8 @@
-using Bifrost.Application;
-using Bifrost.Contracts;
-using Bifrost.Endpoints;
-using Bifrost.Infrastructure;
-using Bifrost.WebSockets;
+using cl.MedelCodeFactory.IoT.Bifrost.Application;
+using cl.MedelCodeFactory.IoT.Bifrost.Contracts;
+using cl.MedelCodeFactory.IoT.Bifrost.Endpoints;
+using cl.MedelCodeFactory.IoT.Bifrost.Infrastructure;
+using cl.MedelCodeFactory.IoT.Bifrost.WebSockets;
 
 var builder = WebApplication.CreateBuilder(args);
 

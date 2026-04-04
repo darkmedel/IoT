@@ -1,7 +1,7 @@
 ﻿using System.Text.Json;
-using Bifrost.Application;
+using cl.MedelCodeFactory.IoT.Bifrost.Application;
 
-namespace Bifrost.Endpoints
+namespace cl.MedelCodeFactory.IoT.Bifrost.Endpoints
 {
     public static class DeviceEndpoints
     {

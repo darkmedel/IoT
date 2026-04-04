@@ -1,7 +1,7 @@
-﻿using Almenaras.Configuration;
-using Almenaras.DTOs;
-using Almenaras.Repositories;
-using Almenaras.Services;
+﻿using cl.MedelCodeFactory.IoT.Almenaras.Configuration;
+using cl.MedelCodeFactory.IoT.Almenaras.DTOs;
+using cl.MedelCodeFactory.IoT.Almenaras.Repositories;
+using cl.MedelCodeFactory.IoT.Almenaras.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 

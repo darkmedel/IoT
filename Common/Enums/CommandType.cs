@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Common.Enums
+namespace cl.MedelCodeFactory.IoT.Common.Enums
 {
     internal class CommandType
     {

@@ -1,4 +1,4 @@
-﻿namespace WatchTower.Endpoints
+﻿namespace cl.MedelCodeFactory.IoT.WatchTower.Endpoints
 {
     public class AnalyticsEndpoints
     {

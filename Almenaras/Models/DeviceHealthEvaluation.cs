@@ -1,6 +1,6 @@
 ﻿using System.Text.Json;
 
-namespace Almenaras.Models
+namespace cl.MedelCodeFactory.IoT.Almenaras.Models
 {
     public sealed class DeviceHealthEvaluation
     {

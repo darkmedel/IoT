@@ -1,4 +1,4 @@
-﻿namespace Bifrost.Endpoints
+﻿namespace cl.MedelCodeFactory.IoT.Bifrost.Endpoints
 {
     public class OtaEndpoints
     {

@@ -1,4 +1,4 @@
-﻿namespace Almenaras.Configuration
+﻿namespace cl.MedelCodeFactory.IoT.Almenaras.Configuration
 {
     public sealed class HeartbeatOptions
     {

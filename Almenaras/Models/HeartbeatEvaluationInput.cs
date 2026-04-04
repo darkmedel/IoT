@@ -1,4 +1,4 @@
-﻿namespace Almenaras.Models
+﻿namespace cl.MedelCodeFactory.IoT.Almenaras.Models
 {
     public sealed class HeartbeatEvaluationInput
     {

@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Common.Contracts.Buttons
+namespace cl.MedelCodeFactory.IoT.Common.Contracts.Buttons
 {
     internal class ButtonRuleDto
     {

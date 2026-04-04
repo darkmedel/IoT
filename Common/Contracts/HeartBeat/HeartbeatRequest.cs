@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Common.Contracts.HeartBeat
+namespace cl.MedelCodeFactory.IoT.Common.Contracts.HeartBeat
 {
     internal class HeartbeatRequest
     {

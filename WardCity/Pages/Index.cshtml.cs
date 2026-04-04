@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
-namespace WardCity.Pages
+namespace cl.MedelCodeFactory.IoT.WardCity.Pages
 {
     public class IndexModel : PageModel
     {

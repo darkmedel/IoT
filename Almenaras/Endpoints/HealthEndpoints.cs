@@ -1,4 +1,4 @@
-﻿namespace Almenaras.Endpoints
+﻿namespace cl.MedelCodeFactory.IoT.Almenaras.Endpoints
 {
     public class HealthEndpoints
     {

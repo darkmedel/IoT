@@ -1,4 +1,4 @@
-﻿namespace Almenaras.DTOs
+﻿namespace cl.MedelCodeFactory.IoT.Almenaras.DTOs
 {
     public sealed class HeartbeatAckResponseDTO
     {

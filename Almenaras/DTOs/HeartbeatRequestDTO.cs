@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace Almenaras.DTOs
+namespace cl.MedelCodeFactory.IoT.Almenaras.DTOs
 {
     public sealed class HeartbeatRequestDTO
     {

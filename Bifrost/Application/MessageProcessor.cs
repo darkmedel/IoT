@@ -1,9 +1,9 @@
-﻿using Bifrost.Contracts;
-using Bifrost.Domain;
-using Bifrost.Infrastructure;
+﻿using cl.MedelCodeFactory.IoT.Bifrost.Contracts;
+using cl.MedelCodeFactory.IoT.Bifrost.Domain;
+using cl.MedelCodeFactory.IoT.Bifrost.Infrastructure;
 using System.Globalization;
 
-namespace Bifrost.Application
+namespace cl.MedelCodeFactory.IoT.Bifrost.Application
 {
     public class MessageProcessor
     {

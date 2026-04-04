@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Common.Contracts.Devices
+namespace cl.MedelCodeFactory.IoT.Common.Contracts.Devices
 {
     internal class DeviceAssignmentRequest
     {

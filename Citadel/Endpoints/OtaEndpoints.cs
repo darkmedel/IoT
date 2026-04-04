@@ -1,4 +1,4 @@
-﻿namespace Citadel.Endpoints
+﻿namespace cl.MedelCodeFactory.IoT.Citadel.Endpoints
 {
     public class OtaEndpoints
     {

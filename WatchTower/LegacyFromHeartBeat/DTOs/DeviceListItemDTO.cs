@@ -1,4 +1,4 @@
-﻿namespace WatchTower.LegacyFromHeartBeat.DTOs
+﻿namespace cl.MedelCodeFactory.IoT.WatchTower.LegacyFromHeartBeat.DTOs
 {
     public sealed class DeviceListItemDTO
     {

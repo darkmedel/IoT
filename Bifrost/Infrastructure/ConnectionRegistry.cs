@@ -1,7 +1,7 @@
-﻿using Bifrost.Domain;
+﻿using cl.MedelCodeFactory.IoT.Bifrost.Domain;
 using System.Collections.Concurrent;
 
-namespace Bifrost.Infrastructure
+namespace cl.MedelCodeFactory.IoT.Bifrost.Infrastructure
 {
     public class ConnectionRegistry
     {

@@ -1,4 +1,4 @@
-﻿namespace WatchTower.LegacyFromHeartBeat.Models
+﻿namespace cl.MedelCodeFactory.IoT.WatchTower.LegacyFromHeartBeat.Models
 {
     public sealed class DeviceHeartbeatSnapshot
     {

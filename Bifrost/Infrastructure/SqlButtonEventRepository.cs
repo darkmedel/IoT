@@ -1,9 +1,9 @@
-﻿using Bifrost.Contracts;
-using Bifrost.Domain;
+﻿using cl.MedelCodeFactory.IoT.Bifrost.Contracts;
+using cl.MedelCodeFactory.IoT.Bifrost.Domain;
 using Microsoft.Data.SqlClient;
 using System.Data;
 
-namespace Bifrost.Infrastructure
+namespace cl.MedelCodeFactory.IoT.Bifrost.Infrastructure
 {
     public class SqlButtonEventRepository : IButtonEventRepository
     {

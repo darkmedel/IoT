@@ -1,9 +1,9 @@
 ﻿using System.Data;
 using Microsoft.Data.SqlClient;
-using Almenaras.DTOs;
-using Almenaras.Models;
+using cl.MedelCodeFactory.IoT.Almenaras.DTOs;
+using cl.MedelCodeFactory.IoT.Almenaras.Models;
 
-namespace Almenaras.Repositories
+namespace cl.MedelCodeFactory.IoT.Almenaras.Repositories
 {
     public sealed class SqlHeartbeatRepository : IHeartbeatRepository
     {

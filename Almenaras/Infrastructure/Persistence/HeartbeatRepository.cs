@@ -1,4 +1,4 @@
-﻿namespace Almenaras.Infrastructure.Persistence
+﻿namespace cl.MedelCodeFactory.IoT.Almenaras.Infrastructure.Persistence
 {
     public class HeartbeatRepository
     {

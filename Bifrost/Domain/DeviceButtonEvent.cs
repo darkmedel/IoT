@@ -1,4 +1,4 @@
-﻿namespace Bifrost.Domain
+﻿namespace cl.MedelCodeFactory.IoT.Bifrost.Domain
 {
     public class DeviceButtonEvent
     {

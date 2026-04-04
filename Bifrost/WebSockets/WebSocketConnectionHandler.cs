@@ -1,10 +1,10 @@
-﻿using Bifrost.Application;
-using Bifrost.Infrastructure;
-using cl.MedelCodeFactory.IoT.GateWay.Domain;
+﻿using cl.MedelCodeFactory.IoT.Bifrost.Application;
+using cl.MedelCodeFactory.IoT.Bifrost.Infrastructure;
+using cl.MedelCodeFactory.IoT.Bifrost.Domain;
 using System.Net.WebSockets;
 using System.Text;
 
-namespace Bifrost.WebSockets
+namespace cl.MedelCodeFactory.IoT.Bifrost.WebSockets
 {
     public class WebSocketConnectionHandler
     {

@@ -11,7 +11,7 @@ namespace cl.MedelCodeFactory.IoT.Almenaras.Repositories
 
         public SqlHeartbeatRepository(IConfiguration configuration)
         {
-            _connectionString = configuration.GetConnectionString("DefaultConnection")
+            _connectionString = configuration.GetConnectionString("IoTMonitoreo")
                 ?? throw new InvalidOperationException("Connection string not found.");
         }
 

@@ -1,12 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace cl.MedelCodeFactory.IoT.Common.Contracts.HeartBeat
+﻿namespace cl.MedelCodeFactory.IoT.Common.Contracts.Heartbeat
 {
-    internal class HeartbeatRequest
+    public class HeartbeatRequest
     {
+        public string DeviceId { get; set; } = string.Empty;
+        public long Uptime { get; set; }
+        public int Rssi { get; set; }
+        public bool WsConnected { get; set; }
+        public int EventQueueSize { get; set; }
+        public long FreeHeap { get; set; }
     }
 }

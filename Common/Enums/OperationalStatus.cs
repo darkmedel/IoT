@@ -1,12 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Common.Enums
+﻿namespace cl.MedelCodeFactory.IoT.Common.Enums
 {
-    internal class OperationalStatus
+    public static class OperationalStatus
     {
+        public const string Unknown = "Unknown";
+        public const string Online = "Online";
+        public const string Degraded = "Degraded";
+        public const string Delayed = "Delayed";
+        public const string Offline = "Offline";
     }
 }

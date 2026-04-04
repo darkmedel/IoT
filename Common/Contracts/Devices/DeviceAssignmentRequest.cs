@@ -2,9 +2,9 @@
 {
     public class DeviceAssignmentRequest
     {
-        public string DeviceId { get; set; }
+        public string DeviceId { get; set; } = string.Empty;
         public int EmpresaId { get; set; }
-        public string NombreDispositivo { get; set; }
-        public string Descripcion { get; set; }
+        public string NombreDispositivo { get; set; } = string.Empty;
+        public string Descripcion { get; set; } = string.Empty;
     }
 }

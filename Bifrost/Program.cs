@@ -1,26 +1,18 @@
 using cl.MedelCodeFactory.IoT.Bifrost.Application;
-using cl.MedelCodeFactory.IoT.Bifrost.Handlers;
 using cl.MedelCodeFactory.IoT.Bifrost.Infrastructure;
-using cl.MedelCodeFactory.IoT.Bifrost.Services;
 using cl.MedelCodeFactory.IoT.Bifrost.WebSockets;
-using Common.Contracts.Commands;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
 
 builder.Services.AddSingleton<MessageDeduplicationService>();
 builder.Services.AddSingleton<ConnectionRegistry>();
 builder.Services.AddSingleton<MessageProcessor>();
 builder.Services.AddSingleton<WebSocketConnectionHandler>();
 builder.Services.AddSingleton<DeviceCommandSender>();
-builder.Services.AddSingleton<OtaCommandBuilder>();
 
 var app = builder.Build();
-
-app.UseSwagger();
-app.UseSwaggerUI();
 
 app.UseWebSockets();
 
@@ -73,39 +65,6 @@ app.MapPost("/devices/{deviceId}/cmd/status", async (string deviceId, DeviceComm
 app.MapPost("/devices/{deviceId}/cmd/reboot", async (string deviceId, DeviceCommandSender sender) =>
 {
     var result = await sender.SendAsync(deviceId, "CMD|REBOOT");
-    return result.Success ? Results.Ok(result) : Results.NotFound(result);
-});
-
-app.MapPost("/devices/{deviceId}/config", async (
-    string deviceId,
-    ButtonConfigRequest request,
-    DeviceCommandSender sender) =>
-{
-    if (!string.Equals(deviceId, request.DeviceId, StringComparison.OrdinalIgnoreCase))
-    {
-        return Results.BadRequest(new { message = "Route deviceId and body DeviceId do not match." });
-    }
-
-    var payload = System.Text.Json.JsonSerializer.Serialize(request);
-    var result = await sender.SendAsync(deviceId, $"CFG_BTN|{payload}");
-
-    return result.Success ? Results.Ok(result) : Results.NotFound(result);
-});
-
-app.MapPost("/devices/{deviceId}/ota", async (
-    string deviceId,
-    cl.MedelCodeFactory.IoT.Common.Contracts.Commands.OtaRequest request,
-    OtaCommandBuilder otaCommandBuilder,
-    DeviceCommandSender sender) =>
-{
-    if (!string.Equals(deviceId, request.DeviceId, StringComparison.OrdinalIgnoreCase))
-    {
-        return Results.BadRequest(new { message = "Route deviceId and body DeviceId do not match." });
-    }
-
-    var command = otaCommandBuilder.Build(request);
-    var result = await sender.SendAsync(deviceId, command);
-
     return result.Success ? Results.Ok(result) : Results.NotFound(result);
 });
 

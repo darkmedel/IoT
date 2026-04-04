@@ -2,7 +2,7 @@
 {
     public class EmpresaRequest
     {
-        public string Codigo { get; set; }
-        public string Nombre { get; set; }
+        public string Codigo { get; set; } = string.Empty;
+        public string Nombre { get; set; } = string.Empty;
     }
 }

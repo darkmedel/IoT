@@ -1,4 +1,4 @@
-﻿namespace WardCity.Repositories
+﻿namespace cl.MedelCodeFactory.IoT.WardCity.Repositories
 {
     public class SqlDeviceConfigurationRepository
     {

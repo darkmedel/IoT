@@ -1,18 +1,17 @@
-﻿using cl.MedelCodeFactory.IoT.Common.Contracts.Commands;
-using cl.MedelCodeFactory.IoT.Bifrost.Application;
+﻿using System.Text.Json;
+using cl.MedelCodeFactory.IoT.Common.Contracts.Commands;
 using cl.MedelCodeFactory.IoT.Bifrost.Infrastructure;
-using cl.MedelCodeFactory.IoT.Bifrost.Services;
+using cl.MedelCodeFactory.IoT.Bifrost.Application;
 
 namespace cl.MedelCodeFactory.IoT.GateWay.Endpoints
 {
-    public static class DeviceOtaEndpoints
+    public static class DeviceConfigEndpoints
     {
-        public static IEndpointRouteBuilder MapDeviceOtaEndpoints(this IEndpointRouteBuilder app)
+        public static IEndpointRouteBuilder MapDeviceConfigEndpoints(this IEndpointRouteBuilder app)
         {
-            app.MapPost("/devices/{deviceId}/ota", async (
+            app.MapPost("/devices/{deviceId}/config", async (
                 string deviceId,
-                OtaRequest request,
-                OtaCommandBuilder otaCommandBuilder,
+                ButtonConfigRequest request,
                 DeviceCommandSender sender) =>
             {
                 if (!string.Equals(deviceId, request.DeviceId, StringComparison.OrdinalIgnoreCase))
@@ -20,8 +19,8 @@ namespace cl.MedelCodeFactory.IoT.GateWay.Endpoints
                     return Results.BadRequest(new { message = "Route deviceId and body DeviceId do not match." });
                 }
 
-                var command = otaCommandBuilder.Build(request);
-                var result = await sender.SendAsync(deviceId, command);
+                string payload = JsonSerializer.Serialize(request);
+                var result = await sender.SendAsync(deviceId, $"CFG_BTN|{payload}");
 
                 return result.Success
                     ? Results.Ok(result)

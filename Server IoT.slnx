@@ -1,7 +1,8 @@
 <Solution>
+  <Project Path="Citadel/Citadel.csproj" Id="c6a5ba4f-8a2e-49d7-8b63-d38948076ac7" />
   <Project Path="Common/Common.csproj" />
-  <Project Path="DashBoard/DashBoard.csproj" />
-  <Project Path="GateWay/GateWay.csproj" />
-  <Project Path="HeartBeat/HeartBeat.csproj" />
+  <Project Path="WardCity/WardCity.csproj" />
+  <Project Path="Bifrost/Bifrost.csproj" />
+  <Project Path="Almenaras/Almenaras.csproj" />
   <Project Path="WatchTower/WatchTower.csproj" />
 </Solution>

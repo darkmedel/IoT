@@ -1,4 +1,4 @@
-﻿namespace HeartBeat.DTOs
+﻿namespace WatchTower.LegacyFromHeartBeat.DTOs
 {
     public class DeviceHeartbeatStatusResponse
     {

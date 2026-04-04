@@ -10,4 +10,11 @@
     <ProjectReference Include="..\Common\Common.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Configuration\" />
+    <Folder Include="Contracts\" />
+    <Folder Include="Infrastructure\Queries\" />
+    <Folder Include="Infrastructure\Persistence\" />
+  </ItemGroup>
+
 </Project>

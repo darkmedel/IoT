@@ -1,4 +1,4 @@
-﻿namespace cl.MedelCodeFactory.IoT.HeartBeat.Models
+﻿namespace WatchTower.LegacyFromHeartBeat.Models
 {
     public class DeviceInventoryRecord
     {

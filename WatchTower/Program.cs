@@ -4,6 +4,7 @@ using cl.MedelCodeFactory.IoT.WatchTower.Repositories;
 using cl.MedelCodeFactory.IoT.WatchTower.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.UseUrls("http://0.0.0.0:5090");
 
 builder.Services.Configure<WatchTowerOptions>(
     builder.Configuration.GetSection(WatchTowerOptions.SectionName));

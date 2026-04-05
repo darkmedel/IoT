@@ -1,12 +1,19 @@
-﻿const state = {
+﻿const AUTO_REFRESH_MS = 5000;
+const OFFLINE_THRESHOLD_SECONDS = 120;
+
+const state = {
     devices: [],
-    selectedDeviceId: null
+    visibleDevices: [],
+    selectedDeviceId: null,
+    isLoading: false
 };
 
 const elements = {
     statusFilter: document.getElementById("statusFilter"),
     empresaFilter: document.getElementById("empresaFilter"),
+    searchBox: document.getElementById("searchBox"),
     refreshButton: document.getElementById("refreshButton"),
+    lastRefreshLabel: document.getElementById("lastRefreshLabel"),
     devicesMessage: document.getElementById("devicesMessage"),
     historyMessage: document.getElementById("historyMessage"),
     devicesTableBody: document.getElementById("devicesTableBody"),
@@ -17,41 +24,38 @@ const elements = {
 document.addEventListener("DOMContentLoaded", () => {
     wireEvents();
     loadDevices();
+    setInterval(() => {
+        loadDevices(true);
+    }, AUTO_REFRESH_MS);
 });
 
 function wireEvents() {
     elements.refreshButton.addEventListener("click", () => loadDevices());
-    elements.statusFilter.addEventListener("change", () => loadDevices());
 
-    if (elements.empresaFilter) {
-        elements.empresaFilter.addEventListener("change", () => {
-            if (!elements.empresaFilter.value) {
-                renderDevices(state.devices);
-                autoSelectFirstVisible();
-                return;
-            }
+    elements.statusFilter.addEventListener("change", () => {
+        loadDevices();
+    });
 
-            const empresaNombre = elements.empresaFilter.options[elements.empresaFilter.selectedIndex]?.text || "";
-            const filtered = state.devices.filter(d => (d.empresaNombre || "Sin empresa") === empresaNombre);
+    elements.empresaFilter.addEventListener("change", () => {
+        applyLocalFiltersAndRender();
+    });
 
-            renderDevices(filtered);
-
-            if (!filtered.length) {
-                clearDetail();
-                clearHistory("Sin datos históricos.");
-                setMessage(elements.devicesMessage, "No hay dispositivos para la empresa seleccionada.");
-                return;
-            }
-
-            setMessage(elements.devicesMessage, `${filtered.length} dispositivo(s) encontrados.`);
-            selectDevice(filtered[0].deviceId);
-        });
-    }
+    elements.searchBox.addEventListener("input", () => {
+        applyLocalFiltersAndRender();
+    });
 }
 
-async function loadDevices() {
-    setMessage(elements.devicesMessage, "Cargando dispositivos...");
-    renderDevicesLoading();
+async function loadDevices(isAutoRefresh = false) {
+    if (state.isLoading) {
+        return;
+    }
+
+    state.isLoading = true;
+
+    if (!isAutoRefresh) {
+        setMessage(elements.devicesMessage, "Cargando dispositivos...");
+        renderDevicesLoading();
+    }
 
     const params = new URLSearchParams();
 
@@ -64,7 +68,7 @@ async function loadDevices() {
         : "/api/devices";
 
     try {
-        const response = await fetch(url);
+        const response = await fetch(url, { cache: "no-store" });
 
         if (!response.ok) {
             throw new Error(`Error HTTP ${response.status}`);
@@ -74,38 +78,61 @@ async function loadDevices() {
         state.devices = Array.isArray(devices) ? devices : [];
 
         populateEmpresaFilter(state.devices);
-        renderDevices(state.devices);
+        applyLocalFiltersAndRender();
 
-        if (state.devices.length === 0) {
-            setMessage(elements.devicesMessage, "No hay dispositivos para el filtro seleccionado.");
+        updateLastRefreshLabel();
+
+        if (!state.visibleDevices.length) {
             clearDetail();
             clearHistory("Sin datos históricos.");
             return;
         }
 
-        setMessage(elements.devicesMessage, `${state.devices.length} dispositivo(s) encontrados.`);
-
-        let targetId = state.selectedDeviceId;
-
-        if (!targetId || !state.devices.some(d => d.deviceId === targetId)) {
-            targetId = state.devices[0].deviceId;
+        if (!state.selectedDeviceId || !state.visibleDevices.some(d => d.deviceId === state.selectedDeviceId)) {
+            state.selectedDeviceId = state.visibleDevices[0].deviceId;
         }
 
-        await selectDevice(targetId);
+        await selectDevice(state.selectedDeviceId, true);
     } catch (error) {
         console.error(error);
         setMessage(elements.devicesMessage, "No fue posible cargar los dispositivos.", true);
         renderDevicesError();
         clearDetail();
         clearHistory("Sin datos históricos.");
+    } finally {
+        state.isLoading = false;
     }
 }
 
-function populateEmpresaFilter(devices) {
-    if (!elements.empresaFilter) {
+function applyLocalFiltersAndRender() {
+    const empresa = elements.empresaFilter.value;
+    const search = (elements.searchBox.value || "").trim().toLowerCase();
+
+    let devices = [...state.devices];
+
+    if (empresa) {
+        devices = devices.filter(d => (d.empresaNombre || "Sin empresa") === empresa);
+    }
+
+    if (search) {
+        devices = devices.filter(d => (d.deviceId || "").toLowerCase().includes(search));
+    }
+
+    devices.sort(compareDevicesByPriority);
+
+    state.visibleDevices = devices;
+
+    renderDevices(devices);
+
+    if (!devices.length) {
+        setMessage(elements.devicesMessage, "No hay dispositivos para el filtro seleccionado.");
         return;
     }
 
+    setMessage(elements.devicesMessage, `${devices.length} dispositivo(s) encontrados.`);
+}
+
+function populateEmpresaFilter(devices) {
     const currentValue = elements.empresaFilter.value;
     const empresas = [];
     const seen = new Set();
@@ -137,11 +164,28 @@ function populateEmpresaFilter(devices) {
     elements.empresaFilter.value = exists ? currentValue : "";
 }
 
+function compareDevicesByPriority(a, b) {
+    const order = { Offline: 0, Degraded: 1, Delayed: 2, Online: 3 };
+
+    const statusA = normalizeStatus(a);
+    const statusB = normalizeStatus(b);
+
+    const priorityDiff = (order[statusA] ?? 99) - (order[statusB] ?? 99);
+    if (priorityDiff !== 0) {
+        return priorityDiff;
+    }
+
+    const dateA = new Date(a.lastHeartbeatReceivedAtUtc || 0).getTime();
+    const dateB = new Date(b.lastHeartbeatReceivedAtUtc || 0).getTime();
+
+    return dateB - dateA;
+}
+
 function renderDevices(devices) {
     if (!devices.length) {
         elements.devicesTableBody.innerHTML = `
             <tr>
-                <td colspan="8" class="empty-cell">No hay dispositivos para mostrar.</td>
+                <td colspan="7" class="empty-cell">No hay dispositivos para mostrar.</td>
             </tr>`;
         return;
     }
@@ -156,14 +200,15 @@ function renderDevices(devices) {
             tr.classList.add("selected");
         }
 
+        const effectiveStatus = normalizeStatus(device);
+
         tr.innerHTML = `
             <td>${escapeHtml(device.deviceId)}</td>
-            <td>${escapeHtml(device.empresaNombre || "Sin empresa")}</td>
-            <td>${renderStatusBadge(device.operationalStatus)}</td>
-            <td>${formatDateTime(device.lastHeartbeatReceivedAtUtc)}</td>
-            <td>${device.rssi ?? "-"}</td>
+            <td>${renderStatusBadge(effectiveStatus)}</td>
+            <td>${timeAgo(device.lastHeartbeatReceivedAtUtc)}</td>
+            <td>${renderRssi(device.rssi)}</td>
             <td>${renderWs(device.wsConnected)}</td>
-            <td>${device.eventQueueSize ?? 0}</td>
+            <td>${renderQueue(device.eventQueueSize)}</td>
             <td>${formatNumber(device.freeHeap)}</td>
         `;
 
@@ -175,9 +220,14 @@ function renderDevices(devices) {
     });
 }
 
-async function selectDevice(deviceId) {
+async function selectDevice(deviceId, skipRowRefresh = false) {
     state.selectedDeviceId = deviceId;
-    highlightSelectedRow();
+
+    if (!skipRowRefresh) {
+        renderDevices(state.visibleDevices);
+    } else {
+        highlightSelectedRow();
+    }
 
     await Promise.all([
         loadDeviceDetail(deviceId),
@@ -185,25 +235,14 @@ async function selectDevice(deviceId) {
     ]);
 }
 
-function autoSelectFirstVisible() {
-    const firstRow = elements.devicesTableBody.querySelector("tr.clickable");
-    if (!firstRow) {
-        return;
-    }
-
-    const firstCell = firstRow.querySelector("td");
-    if (!firstCell) {
-        return;
-    }
-
-    selectDevice(firstCell.textContent.trim());
-}
-
 function highlightSelectedRow() {
     const rows = elements.devicesTableBody.querySelectorAll("tr");
     rows.forEach(row => row.classList.remove("selected"));
 
-    const targetRow = Array.from(rows).find(row => row.firstElementChild && row.firstElementChild.textContent === state.selectedDeviceId);
+    const targetRow = Array.from(rows).find(row =>
+        row.firstElementChild && row.firstElementChild.textContent.trim() === state.selectedDeviceId
+    );
+
     if (targetRow) {
         targetRow.classList.add("selected");
     }
@@ -213,7 +252,7 @@ async function loadDeviceDetail(deviceId) {
     elements.deviceDetail.innerHTML = "Cargando detalle...";
 
     try {
-        const response = await fetch(`/api/devices/${encodeURIComponent(deviceId)}`);
+        const response = await fetch(`/api/devices/${encodeURIComponent(deviceId)}`, { cache: "no-store" });
 
         if (!response.ok) {
             throw new Error(`Error HTTP ${response.status}`);
@@ -231,7 +270,7 @@ async function loadDeviceHistory(deviceId) {
     setMessage(elements.historyMessage, "Cargando histórico...");
 
     try {
-        const response = await fetch(`/api/devices/${encodeURIComponent(deviceId)}/history?limit=20`);
+        const response = await fetch(`/api/devices/${encodeURIComponent(deviceId)}/history?limit=20`, { cache: "no-store" });
 
         if (!response.ok) {
             throw new Error(`Error HTTP ${response.status}`);
@@ -248,6 +287,8 @@ async function loadDeviceHistory(deviceId) {
 }
 
 function renderDeviceDetail(device) {
+    const effectiveStatus = normalizeStatus(device);
+
     const issues = device.issuesJson
         ? `<pre class="pre-issues">${escapeHtml(device.issuesJson)}</pre>`
         : "Sin issues";
@@ -264,7 +305,7 @@ function renderDeviceDetail(device) {
             </div>
             <div class="detail-item">
                 <span class="detail-label">Estado</span>
-                <div class="detail-value">${renderStatusBadge(device.operationalStatus)}</div>
+                <div class="detail-value">${renderStatusBadge(effectiveStatus)}</div>
             </div>
             <div class="detail-item">
                 <span class="detail-label">Último heartbeat</span>
@@ -276,7 +317,7 @@ function renderDeviceDetail(device) {
             </div>
             <div class="detail-item">
                 <span class="detail-label">RSSI</span>
-                <div class="detail-value">${device.rssi ?? "-"}</div>
+                <div class="detail-value">${renderRssi(device.rssi)}</div>
             </div>
             <div class="detail-item">
                 <span class="detail-label">WebSocket</span>
@@ -284,7 +325,7 @@ function renderDeviceDetail(device) {
             </div>
             <div class="detail-item">
                 <span class="detail-label">EventQueueSize</span>
-                <div class="detail-value">${device.eventQueueSize ?? 0}</div>
+                <div class="detail-value">${renderQueue(device.eventQueueSize)}</div>
             </div>
             <div class="detail-item">
                 <span class="detail-label">FreeHeap</span>
@@ -307,29 +348,80 @@ function renderHistory(items) {
     elements.historyTableBody.innerHTML = "";
 
     items.forEach(item => {
+        const effectiveStatus = normalizeStatus(item);
+
         const tr = document.createElement("tr");
         tr.innerHTML = `
             <td>${formatDateTime(item.receivedAtUtc)}</td>
-            <td>${renderStatusBadge(item.operationalStatus)}</td>
-            <td>${item.rssi ?? "-"}</td>
+            <td>${renderStatusBadge(effectiveStatus)}</td>
+            <td>${renderRssi(item.rssi)}</td>
             <td>${renderWs(item.wsConnected)}</td>
-            <td>${item.eventQueueSize ?? 0}</td>
+            <td>${renderQueue(item.eventQueueSize)}</td>
         `;
         elements.historyTableBody.appendChild(tr);
     });
 }
 
+function normalizeStatus(device) {
+    const originalStatus = device.operationalStatus || "Offline";
+
+    if (!device.lastHeartbeatReceivedAtUtc) {
+        return originalStatus;
+    }
+
+    const now = new Date();
+    const lastHeartbeat = new Date(device.lastHeartbeatReceivedAtUtc || device.receivedAtUtc);
+
+    if (Number.isNaN(lastHeartbeat.getTime())) {
+        return originalStatus;
+    }
+
+    const diffSeconds = Math.floor((now - lastHeartbeat) / 1000);
+
+    if (diffSeconds > OFFLINE_THRESHOLD_SECONDS) {
+        return "Offline";
+    }
+
+    return originalStatus;
+}
+
+function renderRssi(rssi) {
+    if (rssi === null || rssi === undefined) {
+        return "-";
+    }
+
+    const cssClass = rssi <= -80
+        ? "metric-danger"
+        : rssi <= -70
+            ? "metric-warning"
+            : "";
+
+    return `<span class="${cssClass}">${escapeHtml(String(rssi))}</span>`;
+}
+
+function renderQueue(queueSize) {
+    const value = queueSize ?? 0;
+
+    const cssClass = value > 10
+        ? "metric-danger"
+        : value > 0
+            ? "metric-warning"
+            : "";
+
+    return `<span class="${cssClass}">${value}</span>`;
+}
+
 function renderDevicesLoading() {
     elements.devicesTableBody.innerHTML = `
         <tr>
-            <td colspan="8" class="empty-cell">Cargando dispositivos...</td>
+            <td colspan="7" class="empty-cell">Cargando dispositivos...</td>
         </tr>`;
 }
 
 function renderDevicesError() {
     elements.devicesTableBody.innerHTML = `
         <tr>
-            <td colspan="8" class="empty-cell">No fue posible cargar los dispositivos.</td>
+            <td colspan="7" class="empty-cell">No fue posible cargar los dispositivos.</td>
         </tr>`;
 }
 
@@ -360,6 +452,38 @@ function renderWs(connected) {
         : `<span class="ws-pill ws-off">Desconectado</span>`;
 }
 
+function timeAgo(value) {
+    if (!value) {
+        return "-";
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
+
+    const seconds = Math.floor((new Date() - date) / 1000);
+
+    if (seconds < 0) {
+        return formatDateTime(value);
+    }
+
+    if (seconds < 60) {
+        return `hace ${seconds}s`;
+    }
+
+    if (seconds < 3600) {
+        return `hace ${Math.floor(seconds / 60)} min`;
+    }
+
+    if (seconds < 86400) {
+        return `hace ${Math.floor(seconds / 3600)} h`;
+    }
+
+    return formatDateTime(value);
+}
+
 function formatDateTime(value) {
     if (!value) {
         return "-";
@@ -380,6 +504,11 @@ function formatNumber(value) {
     }
 
     return Number(value).toLocaleString("es-CL");
+}
+
+function updateLastRefreshLabel() {
+    const now = new Date();
+    elements.lastRefreshLabel.textContent = `Última actualización: ${now.toLocaleTimeString("es-CL")}`;
 }
 
 function escapeHtml(value) {

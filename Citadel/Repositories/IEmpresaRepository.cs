@@ -1,6 +1,11 @@
-﻿namespace Citadel.Repositories
+using cl.MedelCodeFactory.IoT.Citadel.Contracts;
+
+namespace cl.MedelCodeFactory.IoT.Citadel.Repositories;
+
+public interface IEmpresaRepository
 {
-    public class IEmpresaRepository
-    {
-    }
+    Task<IReadOnlyList<EmpresaResponse>> GetAllAsync(CancellationToken cancellationToken);
+    Task<EmpresaResponse?> GetByIdAsync(int id, CancellationToken cancellationToken);
+    Task<bool> ExistsByCodigoAsync(string codigo, CancellationToken cancellationToken);
+    Task<EmpresaResponse> CreateAsync(CreateEmpresaRequest request, CancellationToken cancellationToken);
 }

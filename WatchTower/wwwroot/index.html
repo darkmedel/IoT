@@ -13,19 +13,25 @@
                 <h1>WatchTower</h1>
                 <p>Monitoreo operativo de dispositivos IoT</p>
             </div>
+
             <div class="topbar-right">
-                <div class="topbar-status">
-                    <span class="status-dot"></span>
-                    <span id="lastRefreshLabel">Actualizando...</span>
+                <div class="service-status">
+                    <span class="service-label">Servicio</span>
+                    <span id="serviceHealthBadge" class="health-badge loading">Cargando...</span>
+                    <span id="lastRefreshText" class="last-refresh">-</span>
                 </div>
-                <button id="refreshButton" class="btn btn-primary" type="button">Actualizar</button>
+
+                <button id="refreshButton" class="btn btn-primary" type="button">
+                    Actualizar
+                </button>
             </div>
         </header>
 
-        <main class="layout">
+        <main class="layout layout-single">
             <section class="panel panel-main">
                 <div class="panel-header">
                     <h2>Dispositivos</h2>
+
                     <div class="filters">
                         <label>
                             <span>Estado</span>
@@ -46,31 +52,34 @@
                         </label>
 
                         <label class="search-box">
-                            <span>Buscar device</span>
-                            <input id="searchBox" type="text" placeholder="Ej. 808A26A50528" />
+                            <span>Buscar DeviceId</span>
+                            <input id="searchBox" type="text" placeholder="Ej: 808A26A50528" />
                         </label>
                     </div>
                 </div>
 
-                <div class="panel-body">
+                <div class="panel-body panel-body-compact">
                     <div id="devicesMessage" class="message"></div>
 
                     <div class="table-wrap">
-                        <table class="data-table">
+                        <table class="data-table data-table-dense data-table-devices">
                             <thead>
                                 <tr>
                                     <th>DeviceId</th>
+                                    <th>Empresa</th>
                                     <th>Estado</th>
                                     <th>Último heartbeat</th>
+                                    <th>Uptime</th>
                                     <th>RSSI</th>
                                     <th>WS</th>
                                     <th>Cola</th>
                                     <th>FreeHeap</th>
+                                    <th>Issues</th>
                                 </tr>
                             </thead>
                             <tbody id="devicesTableBody">
                                 <tr>
-                                    <td colspan="7" class="empty-cell">Cargando dispositivos...</td>
+                                    <td colspan="10" class="empty-cell">Cargando dispositivos...</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -78,45 +87,34 @@
                 </div>
             </section>
 
-            <aside class="sidebar">
-                <section class="panel">
-                    <div class="panel-header">
-                        <h2>Detalle</h2>
-                    </div>
-                    <div class="panel-body">
-                        <div id="deviceDetail" class="detail-empty">
-                            Selecciona un dispositivo para ver su detalle.
-                        </div>
-                    </div>
-                </section>
+            <section class="panel">
+                <div class="panel-header">
+                    <h2>Histórico</h2>
+                </div>
+                <div class="panel-body panel-body-compact">
+                    <div id="historyMessage" class="message"></div>
 
-                <section class="panel">
-                    <div class="panel-header">
-                        <h2>Histórico</h2>
+                    <div class="history-wrap">
+                        <table class="data-table data-table-dense data-table-compact">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Estado</th>
+                                    <th>RSSI</th>
+                                    <th>WS</th>
+                                    <th>Cola</th>
+                                    <th>FreeHeap</th>
+                                </tr>
+                            </thead>
+                            <tbody id="historyTableBody">
+                                <tr>
+                                    <td colspan="6" class="empty-cell">Sin selección.</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
-                    <div class="panel-body">
-                        <div id="historyMessage" class="message"></div>
-                        <div class="history-wrap">
-                            <table class="data-table data-table-compact">
-                                <thead>
-                                    <tr>
-                                        <th>Fecha</th>
-                                        <th>Estado</th>
-                                        <th>RSSI</th>
-                                        <th>WS</th>
-                                        <th>Cola</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="historyTableBody">
-                                    <tr>
-                                        <td colspan="5" class="empty-cell">Sin selección.</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </section>
-            </aside>
+                </div>
+            </section>
         </main>
     </div>
 

@@ -7,26 +7,43 @@ public static class DeviceAssignmentEndpoints
 {
     public static IEndpointRouteBuilder MapDeviceAssignmentEndpoints(this IEndpointRouteBuilder app)
     {
-        var assignments = app.MapGroup("/api/asignaciones").WithTags("Asignaciones");
-
-        assignments.MapPost("/", async (
+        app.MapPost("/api/asignaciones", async (
             CreateAssignmentRequest request,
             IEmpresaRepository empresaRepository,
             IDeviceInventoryRepository deviceRepository,
             IDeviceAssignmentRepository assignmentRepository,
             CancellationToken cancellationToken) =>
         {
-            var normalizedDeviceId = NormalizeDeviceId(request.DeviceId);
-
-            var empresa = await empresaRepository.GetByIdAsync(request.EmpresaId, cancellationToken);
-            if (empresa is null)
+            if (request.EmpresaId <= 0)
             {
-                return Results.BadRequest(new { message = $"Empresa {request.EmpresaId} no existe." });
+                return Results.BadRequest(new { message = "empresaId es obligatorio y debe ser mayor a 0." });
+            }
+
+            if (string.IsNullOrWhiteSpace(request.DeviceId))
+            {
+                return Results.BadRequest(new { message = "deviceId es obligatorio." });
+            }
+
+            if (string.IsNullOrWhiteSpace(request.NombreDispositivo))
+            {
+                return Results.BadRequest(new { message = "nombreDispositivo es obligatorio." });
+            }
+
+            if (string.IsNullOrWhiteSpace(request.Descripcion))
+            {
+                return Results.BadRequest(new { message = "descripcion es obligatoria." });
+            }
+
+            var normalizedDeviceId = request.DeviceId.Trim().ToUpperInvariant();
+
+            if (!await empresaRepository.ExistsAsync(request.EmpresaId, cancellationToken))
+            {
+                return Results.BadRequest(new { message = $"La empresa {request.EmpresaId} no existe." });
             }
 
             if (!await deviceRepository.ExistsAsync(normalizedDeviceId, cancellationToken))
             {
-                return Results.BadRequest(new { message = $"Device {normalizedDeviceId} no existe." });
+                return Results.BadRequest(new { message = $"El dispositivo {normalizedDeviceId} no existe." });
             }
 
             if (await assignmentRepository.HasActiveAssignmentAsync(normalizedDeviceId, cancellationToken))
@@ -38,45 +55,54 @@ public static class DeviceAssignmentEndpoints
                 request with
                 {
                     DeviceId = normalizedDeviceId,
-                    NombreDispositivo = request.NombreDispositivo?.Trim(),
-                    Descripcion = request.Descripcion?.Trim()
+                    NombreDispositivo = request.NombreDispositivo.Trim(),
+                    Descripcion = request.Descripcion.Trim()
                 },
                 cancellationToken);
 
-            return Results.Created($"/api/devices/{created.DeviceId}/empresa", created);
-        });
+            return Results.Ok(created);
+        })
+        .WithTags("Asignaciones");
 
-        assignments.MapPost("/{deviceId}/desasignar", async (
+        app.MapPost("/api/asignaciones/{deviceId}/desasignar", async (
             string deviceId,
-            HttpContext httpContext,
+            string? usuario,
             IDeviceAssignmentRepository assignmentRepository,
             CancellationToken cancellationToken) =>
         {
-            var normalizedDeviceId = NormalizeDeviceId(deviceId);
-            var usuario = httpContext.Request.Headers["X-User"].FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(deviceId))
+            {
+                return Results.BadRequest(new { message = "deviceId es obligatorio." });
+            }
+
+            var normalizedDeviceId = deviceId.Trim().ToUpperInvariant();
             var result = await assignmentRepository.UnassignAsync(normalizedDeviceId, usuario, cancellationToken);
 
             return result.Unassigned
                 ? Results.Ok(result)
                 : Results.NotFound(result);
-        });
+        })
+        .WithTags("Asignaciones");
 
         app.MapGet("/api/devices/{deviceId}/empresa", async (
             string deviceId,
             IDeviceAssignmentRepository assignmentRepository,
             CancellationToken cancellationToken) =>
         {
-            var normalizedDeviceId = NormalizeDeviceId(deviceId);
-            var row = await assignmentRepository.GetCurrentAssignmentAsync(normalizedDeviceId, cancellationToken);
+            if (string.IsNullOrWhiteSpace(deviceId))
+            {
+                return Results.BadRequest(new { message = "deviceId es obligatorio." });
+            }
 
-            return row is null
+            var normalizedDeviceId = deviceId.Trim().ToUpperInvariant();
+            var current = await assignmentRepository.GetCurrentAssignmentAsync(normalizedDeviceId, cancellationToken);
+
+            return current is null
                 ? Results.NotFound(new { message = $"El dispositivo {normalizedDeviceId} no tiene empresa asignada." })
-                : Results.Ok(row);
+                : Results.Ok(current);
         })
         .WithTags("Asignaciones");
 
         return app;
     }
-
-    private static string NormalizeDeviceId(string value) => value.Trim().ToUpperInvariant();
 }

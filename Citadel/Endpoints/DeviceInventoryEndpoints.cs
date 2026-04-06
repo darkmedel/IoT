@@ -21,7 +21,7 @@ public static class DeviceInventoryEndpoints
             var row = await repository.GetByIdAsync(normalizedDeviceId, cancellationToken);
 
             return row is null
-                ? Results.NotFound(new { message = $"Device {normalizedDeviceId} no existe." })
+                ? Results.NotFound(new { message = $"El dispositivo {normalizedDeviceId} no existe." })
                 : Results.Ok(row);
         });
 
@@ -32,15 +32,16 @@ public static class DeviceInventoryEndpoints
                 return Results.BadRequest(new { message = "deviceId es obligatorio." });
             }
 
-            if (string.IsNullOrWhiteSpace(request.Nombre))
-            {
-                return Results.BadRequest(new { message = "nombre es obligatorio." });
-            }
-
             var normalizedDeviceId = NormalizeDeviceId(request.DeviceId);
+
             if (normalizedDeviceId.Length != 12)
             {
                 return Results.BadRequest(new { message = "deviceId debe tener exactamente 12 caracteres." });
+            }
+
+            if (!IsHex(normalizedDeviceId))
+            {
+                return Results.BadRequest(new { message = "deviceId debe contener solo caracteres hexadecimales en mayúscula." });
             }
 
             if (await repository.ExistsAsync(normalizedDeviceId, cancellationToken))
@@ -50,18 +51,29 @@ public static class DeviceInventoryEndpoints
 
             if (!await repository.HardwareTypeExistsAsync(request.TipoHardwareId, cancellationToken))
             {
-                return Results.BadRequest(new { message = $"TipoHardwareId {request.TipoHardwareId} no existe." });
+                return Results.BadRequest(new { message = $"TipoHardwareId {request.TipoHardwareId} no existe o está deshabilitado." });
+            }
+
+            if (request.FirmwareId.HasValue)
+            {
+                if (!await repository.FirmwareExistsAsync(request.FirmwareId.Value, cancellationToken))
+                {
+                    return Results.BadRequest(new { message = $"FirmwareId {request.FirmwareId.Value} no existe o está deshabilitado." });
+                }
+
+                if (!await repository.FirmwareBelongsToHardwareAsync(request.FirmwareId.Value, request.TipoHardwareId, cancellationToken))
+                {
+                    return Results.BadRequest(new { message = $"FirmwareId {request.FirmwareId.Value} no pertenece al TipoHardwareId {request.TipoHardwareId}." });
+                }
             }
 
             var created = await repository.CreateAsync(
                 request with
                 {
                     DeviceId = normalizedDeviceId,
-                    Nombre = request.Nombre.Trim(),
-                    Descripcion = request.Descripcion?.Trim(),
-                    SerialNumber = request.SerialNumber?.Trim(),
-                    FirmwareVersion = request.FirmwareVersion?.Trim(),
-                    MacAddress = request.MacAddress?.Trim().ToUpperInvariant()
+                    FirmwareVersion = string.IsNullOrWhiteSpace(request.FirmwareVersion)
+                        ? "UNKNOWN"
+                        : request.FirmwareVersion.Trim()
                 },
                 cancellationToken);
 
@@ -71,5 +83,15 @@ public static class DeviceInventoryEndpoints
         return app;
     }
 
-    private static string NormalizeDeviceId(string value) => value.Trim().ToUpperInvariant();
+    private static string NormalizeDeviceId(string value)
+    {
+        return value.Trim().ToUpperInvariant();
+    }
+
+    private static bool IsHex(string value)
+    {
+        return value.All(c =>
+            (c >= '0' && c <= '9') ||
+            (c >= 'A' && c <= 'F'));
+    }
 }

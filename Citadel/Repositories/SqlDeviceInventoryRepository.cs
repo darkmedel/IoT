@@ -228,6 +228,45 @@ public sealed class SqlDeviceInventoryRepository : IDeviceInventoryRepository
         return await connection.QuerySingleAsync<DeviceResponse>(command);
     }
 
+    public async Task<DeviceResponse> UpdateAsync(string deviceId, CreateDeviceRequest request, CancellationToken cancellationToken)
+    {
+        const string sql = """
+            UPDATE dbo.Device
+            SET
+                TipoHardwareId = @TipoHardwareId,
+                FirmwareId = @FirmwareId,
+                FirmwareVersion = @FirmwareVersion,
+                Habilitado = @Habilitado,
+                UsuarioModificacion = @Usuario,
+                FechaModificacion = SYSUTCDATETIME()
+            OUTPUT
+                INSERTED.DeviceId,
+                INSERTED.TipoHardwareId,
+                INSERTED.FirmwareId,
+                INSERTED.FirmwareVersion,
+                INSERTED.Habilitado,
+                INSERTED.FechaRegistroInventario
+            WHERE DeviceId = @DeviceId;
+            """;
+
+        using IDbConnection connection = _connectionFactory.CreateConnection();
+
+        var command = new CommandDefinition(
+            sql,
+            new
+            {
+                DeviceId = NormalizeDeviceId(deviceId),
+                TipoHardwareId = request.TipoHardwareId,
+                FirmwareId = request.FirmwareId,
+                FirmwareVersion = NormalizeFirmwareVersion(request.FirmwareVersion),
+                Habilitado = request.Habilitado,
+                Usuario = ResolveUsuario(request.Usuario)
+            },
+            cancellationToken: cancellationToken);
+
+        return await connection.QuerySingleAsync<DeviceResponse>(command);
+    }
+
     private string ResolveUsuario(string? requestUsuario)
     {
         if (!string.IsNullOrWhiteSpace(requestUsuario))

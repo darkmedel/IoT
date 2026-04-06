@@ -80,6 +80,57 @@ public static class DeviceInventoryEndpoints
             return Results.Created($"/api/devices/{created.DeviceId}", created);
         });
 
+        group.MapPut("/{deviceId}", async (string deviceId, CreateDeviceRequest request, IDeviceInventoryRepository repository, CancellationToken cancellationToken) =>
+        {
+            var normalizedDeviceId = NormalizeDeviceId(deviceId);
+
+            if (normalizedDeviceId.Length != 12)
+            {
+                return Results.BadRequest(new { message = "deviceId debe tener exactamente 12 caracteres." });
+            }
+
+            if (!IsHex(normalizedDeviceId))
+            {
+                return Results.BadRequest(new { message = "deviceId debe contener solo caracteres hexadecimales en mayúscula." });
+            }
+
+            if (!await repository.ExistsAsync(normalizedDeviceId, cancellationToken))
+            {
+                return Results.NotFound(new { message = $"El dispositivo {normalizedDeviceId} no existe." });
+            }
+
+            if (!await repository.HardwareTypeExistsAsync(request.TipoHardwareId, cancellationToken))
+            {
+                return Results.BadRequest(new { message = $"TipoHardwareId {request.TipoHardwareId} no existe o está deshabilitado." });
+            }
+
+            if (request.FirmwareId.HasValue)
+            {
+                if (!await repository.FirmwareExistsAsync(request.FirmwareId.Value, cancellationToken))
+                {
+                    return Results.BadRequest(new { message = $"FirmwareId {request.FirmwareId.Value} no existe o está deshabilitado." });
+                }
+
+                if (!await repository.FirmwareBelongsToHardwareAsync(request.FirmwareId.Value, request.TipoHardwareId, cancellationToken))
+                {
+                    return Results.BadRequest(new { message = $"FirmwareId {request.FirmwareId.Value} no pertenece al TipoHardwareId {request.TipoHardwareId}." });
+                }
+            }
+
+            var updated = await repository.UpdateAsync(
+                normalizedDeviceId,
+                request with
+                {
+                    DeviceId = normalizedDeviceId,
+                    FirmwareVersion = string.IsNullOrWhiteSpace(request.FirmwareVersion)
+                        ? "UNKNOWN"
+                        : request.FirmwareVersion.Trim()
+                },
+                cancellationToken);
+
+            return Results.Ok(updated);
+        });
+
         return app;
     }
 

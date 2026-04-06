@@ -128,6 +128,40 @@ VALUES
         return await connection.QuerySingleAsync<EmpresaResponse>(command);
     }
 
+    public async Task<EmpresaResponse> UpdateAsync(int id, CreateEmpresaRequest request, CancellationToken cancellationToken)
+    {
+        const string sql = @"
+UPDATE dbo.Empresa
+SET
+    Codigo = @Codigo,
+    Nombre = @Nombre,
+    Habilitado = @Habilitado,
+    UsuarioModificacion = @Usuario,
+    FechaModificacion = SYSUTCDATETIME()
+OUTPUT
+    INSERTED.Id,
+    INSERTED.Codigo,
+    INSERTED.Nombre,
+    INSERTED.Habilitado
+WHERE Id = @Id;";
+
+        using var connection = _connectionFactory.CreateConnection();
+
+        var command = new CommandDefinition(
+            sql,
+            new
+            {
+                Id = id,
+                Codigo = NormalizeCodigo(request.Codigo),
+                Nombre = NormalizeNombre(request.Nombre),
+                Habilitado = request.Habilitado,
+                Usuario = ResolveUsuario(request.Usuario)
+            },
+            cancellationToken: cancellationToken);
+
+        return await connection.QuerySingleAsync<EmpresaResponse>(command);
+    }
+
     private string ResolveUsuario(string? requestUsuario)
     {
         if (!string.IsNullOrWhiteSpace(requestUsuario))

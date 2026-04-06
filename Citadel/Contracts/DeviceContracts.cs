@@ -3,8 +3,9 @@ namespace cl.MedelCodeFactory.IoT.Citadel.Contracts;
 public sealed record CreateDeviceRequest(
     string DeviceId,
     int TipoHardwareId,
-    int? FirmwareId = null,
-    string? FirmwareVersion = null,
+    int? FirmwareId,
+    string? FirmwareVersion,
+    bool Habilitado = true,
     string? Usuario = null);
 
 public sealed record DeviceResponse(

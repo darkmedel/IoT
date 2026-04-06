@@ -11,4 +11,5 @@ public interface IDeviceInventoryRepository
     Task<bool> FirmwareExistsAsync(int firmwareId, CancellationToken cancellationToken);
     Task<bool> FirmwareBelongsToHardwareAsync(int firmwareId, int tipoHardwareId, CancellationToken cancellationToken);
     Task<DeviceResponse> CreateAsync(CreateDeviceRequest request, CancellationToken cancellationToken);
+    Task<DeviceResponse> UpdateAsync(string deviceId, CreateDeviceRequest request, CancellationToken cancellationToken);
 }

@@ -31,7 +31,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+// En desarrollo local puede comentarse si no usarás HTTPS.
+// app.UseHttpsRedirection();
+
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseRouting();
@@ -61,8 +63,8 @@ app.MapEmpresaEndpoints();
 app.MapDeviceInventoryEndpoints();
 app.MapDeviceAssignmentEndpoints();
 
-// ================================
-// Run
-// ================================
+// Próxima iteración recomendada
+// app.MapTipoHardwareEndpoints();
+// app.MapFirmwareEndpoints();
 
 app.Run();
